@@ -14,30 +14,7 @@ public class StockoptimizerApplication {
         SpringApplication.run(StockoptimizerApplication.class, args);
     }
 
-    @Component
-    public class MongoDBConnectionChecker implements CommandLineRunner {
 
-        private final MongoTemplate mongoTemplate;
 
-        @Autowired
-        public MongoDBConnectionChecker(MongoTemplate mongoTemplate) {
-            this.mongoTemplate = mongoTemplate;
-        }
-
-        @Override
-        public void run(String... args) {
-            try {
-                System.out.println("Checking MongoDB connection with Spring's MongoTemplate...");
-                String dbName = mongoTemplate.getDb().getName();
-                System.out.println("✅ Successfully connected to MongoDB: " + dbName);
-                System.out.println("Collections in database:");
-                for (String collection : mongoTemplate.getCollectionNames()) {
-                    System.out.println(" - " + collection);
-                }
-            } catch (Exception e) {
-                System.err.println("❌ Failed to connect to MongoDB with Spring: " + e.getMessage());
-                e.printStackTrace();
-            }
-        }
-    }
 }
+
