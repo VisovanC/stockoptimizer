@@ -1,0 +1,1 @@
+spring.data.mongodb.uri=mongodb+srv://catalinvisovan03:12345@stockoptimizer.wg3cdh9.mongodb.net/stock_optimizer?authSource=admin&retryWrites=true&w=majority&appName=stockoptimizer
