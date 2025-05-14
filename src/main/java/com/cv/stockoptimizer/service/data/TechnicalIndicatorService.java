@@ -10,10 +10,6 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
-
-/**
- * Service for calculating technical indicators from stock data
- */
 @Service
 public class TechnicalIndicatorService {
 
@@ -27,13 +23,8 @@ public class TechnicalIndicatorService {
         this.technicalIndicatorRepository = technicalIndicatorRepository;
     }
 
-    /**
-     * Calculate moving average for a given period
-     *
-     * @param data List of closing prices
-     * @param period Moving average period (e.g., 20 for 20-day MA)
-     * @return List of moving averages (first (period-1) values will be NaN)
-     */
+    //Calculate moving average for a given period
+
     private List<Double> calculateMovingAverage(List<Double> data, int period) {
         List<Double> result = new ArrayList<>(Collections.nCopies(data.size(), Double.NaN));
 
@@ -48,13 +39,7 @@ public class TechnicalIndicatorService {
         return result;
     }
 
-    /**
-     * Calculate Relative Strength Index (RSI)
-     *
-     * @param data List of closing prices
-     * @param period RSI period (typically 14)
-     * @return List of RSI values
-     */
+    // Calculate Relative Strength Index (RSI)
     private List<Double> calculateRSI(List<Double> data, int period) {
         List<Double> result = new ArrayList<>(Collections.nCopies(data.size(), Double.NaN));
 
@@ -93,12 +78,8 @@ public class TechnicalIndicatorService {
         return result;
     }
 
-    /**
-     * Calculate Moving Average Convergence Divergence (MACD)
-     *
-     * @param data List of closing prices
-     * @return Map with MACD line, signal line, and histogram values
-     */
+    // Calculate Moving Average Convergence Divergence (MACD)
+
     private Map<String, List<Double>> calculateMACD(List<Double> data) {
         Map<String, List<Double>> result = new HashMap<>();
 
@@ -134,13 +115,8 @@ public class TechnicalIndicatorService {
         return result;
     }
 
-    /**
-     * Calculate Exponential Moving Average (EMA)
-     *
-     * @param data List of values
-     * @param period EMA period
-     * @return List of EMA values
-     */
+    // Calculate Exponential Moving Average (EMA)
+
     private List<Double> calculateEMA(List<Double> data, int period) {
         List<Double> result = new ArrayList<>(Collections.nCopies(data.size(), Double.NaN));
 
@@ -171,14 +147,8 @@ public class TechnicalIndicatorService {
         return result;
     }
 
-    /**
-     * Calculate Bollinger Bands
-     *
-     * @param data List of closing prices
-     * @param period Moving average period (typically 20)
-     * @param stdDevMultiplier Standard deviation multiplier (typically 2)
-     * @return Map with upper band, middle band, and lower band values
-     */
+    // Calculate Bollinger Bands
+
     private Map<String, List<Double>> calculateBollingerBands(List<Double> data, int period, double stdDevMultiplier) {
         Map<String, List<Double>> result = new HashMap<>();
 
@@ -214,14 +184,8 @@ public class TechnicalIndicatorService {
         return result;
     }
 
-    /**
-     * Calculate all technical indicators for a given stock
-     *
-     * @param symbol Stock symbol
-     * @param from Start date
-     * @param to End date
-     * @return List of technical indicator objects
-     */
+    // Calculate all technical indicators for a given stock
+
     public List<TechnicalIndicator> calculateAllIndicators(String symbol, LocalDate from, LocalDate to) {
         // Fetch stock data for the given period
         List<StockData> stockDataList = stockDataRepository.findBySymbolAndDateBetweenOrderByDateAsc(symbol, from, to);
@@ -279,9 +243,8 @@ public class TechnicalIndicatorService {
         return technicalIndicatorRepository.saveAll(indicators);
     }
 
-    /**
-     * Calculate and store technical indicators for all stocks in the database
-     */
+    // Calculate and store technical indicators for all stocks in the database
+
     public void calculateAndStoreAllIndicators() {
         // Get all unique symbols from the repository
         Set<String> symbols = stockDataRepository.findDistinctSymbols();

@@ -24,7 +24,6 @@ public class Portfolio {
     private String optimizationStatus; // "NOT_OPTIMIZED", "OPTIMIZING", "OPTIMIZED"
     private LocalDateTime lastOptimizedAt;
 
-    // Constructors
     public Portfolio() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -39,7 +38,6 @@ public class Portfolio {
         this.optimizationStatus = "NOT_OPTIMIZED";
     }
 
-    // Nested class for portfolio stocks
     public static class PortfolioStock {
         private String symbol;
         private String companyName;
@@ -47,11 +45,10 @@ public class Portfolio {
         private double entryPrice;
         private LocalDateTime entryDate;
         private double currentPrice;
-        private double weight; // percentage in portfolio
+        private double weight;
         private double returnValue;
         private double returnPercentage;
 
-        // Getters and setters
         public String getSymbol() {
             return symbol;
         }
@@ -125,7 +122,6 @@ public class Portfolio {
         }
     }
 
-    // Getters and setters
     public String getId() {
         return id;
     }

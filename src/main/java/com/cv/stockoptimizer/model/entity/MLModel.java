@@ -20,7 +20,6 @@ public class MLModel {
     private String modelFilePath;
     private List<String> features;
 
-    // Getters and setters
     public String getId() {
         return id;
     }

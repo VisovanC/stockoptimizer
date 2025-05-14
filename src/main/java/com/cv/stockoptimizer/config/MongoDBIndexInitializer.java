@@ -22,24 +22,20 @@ public class MongoDBIndexInitializer {
         try {
             System.out.println("Initializing MongoDB indexes...");
 
-            // Create index for StockData
             mongoTemplate.indexOps("stock_data").ensureIndex(
                     new Index().on("symbol", Sort.Direction.ASC)
                             .on("date", Sort.Direction.ASC)
                             .unique());
 
-            // Create index for TechnicalIndicator
             mongoTemplate.indexOps("technical_indicators").ensureIndex(
                     new Index().on("symbol", Sort.Direction.ASC)
                             .on("date", Sort.Direction.ASC)
                             .unique());
 
-            // Create index for StockPrediction
             mongoTemplate.indexOps("stock_predictions").ensureIndex(
                     new Index().on("symbol", Sort.Direction.ASC)
                             .on("predictionDate", Sort.Direction.DESC));
 
-            // Create index for User
             mongoTemplate.indexOps("users").ensureIndex(
                     new Index().on("username", Sort.Direction.ASC)
                             .unique());
@@ -47,11 +43,10 @@ public class MongoDBIndexInitializer {
                     new Index().on("email", Sort.Direction.ASC)
                             .unique());
 
-            // Create index for Portfolio
             mongoTemplate.indexOps("portfolios").ensureIndex(
                     new Index().on("userId", Sort.Direction.ASC));
 
-            System.out.println("MongoDB indexes initialized successfully.");
+            System.out.println("Indexes initialized successfully.");
         } catch (Exception e) {
             System.err.println("Error initializing MongoDB indexes: " + e.getMessage());
             e.printStackTrace();

@@ -5,9 +5,7 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.LocalDate; /**
- * Entity for storing calculated technical indicators
- */
+import java.time.LocalDate;
 @Document(collection = "technical_indicators")
 @CompoundIndexes({
         @CompoundIndex(name = "symbol_date_idx", def = "{'symbol': 1, 'date': 1}", unique = true)
@@ -19,26 +17,16 @@ public class TechnicalIndicator {
     private String symbol;
     private LocalDate date;
     private double price;
-
-    // Moving Averages
     private Double sma20;
     private Double sma50;
     private Double sma200;
-
-    // Relative Strength Index
     private Double rsi14;
-
-    // MACD
     private Double macdLine;
     private Double macdSignal;
     private Double macdHistogram;
-
-    // Bollinger Bands
     private Double bollingerUpper;
     private Double bollingerMiddle;
     private Double bollingerLower;
-
-    // Getters and setters
     public String getId() {
         return id;
     }

@@ -50,9 +50,6 @@ public class BackendTestController {
         this.stockPredictionRepository = stockPredictionRepository;
     }
 
-    /**
-     * Test endpoint to collect stock data for a specific symbol
-     */
     @GetMapping("/collect-data/{symbol}")
     public ResponseEntity<Map<String, Object>> collectData(@PathVariable String symbol,
                                                            @RequestParam(defaultValue = "30") int days) {
@@ -60,13 +57,10 @@ public class BackendTestController {
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusDays(days);
 
-            // Fetch data
             List<StockData> data = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate);
 
-            // Save to database
             stockDataRepository.saveAll(data);
 
-            // Return summary
             Map<String, Object> response = new HashMap<>();
             response.put("symbol", symbol);
             response.put("dataPoints", data.size());
@@ -82,20 +76,14 @@ public class BackendTestController {
             return ResponseEntity.internalServerError().body(response);
         }
     }
-
-    /**
-     * Test endpoint to calculate technical indicators
-     */
     @GetMapping("/calculate-indicators/{symbol}")
     public ResponseEntity<Map<String, Object>> calculateIndicators(@PathVariable String symbol) {
         try {
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusDays(30);
 
-            // Calculate indicators
             List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(symbol, startDate, endDate);
 
-            // Return summary
             Map<String, Object> response = new HashMap<>();
             response.put("symbol", symbol);
             response.put("indicatorsCalculated", indicators.size());
@@ -109,17 +97,11 @@ public class BackendTestController {
             return ResponseEntity.internalServerError().body(response);
         }
     }
-
-    /**
-     * Test endpoint to train a model
-     */
     @GetMapping("/train-model/{symbol}")
     public ResponseEntity<Map<String, Object>> trainModel(@PathVariable String symbol) {
         try {
-            // Train model
             MLModel model = neuralNetworkService.trainModelForStock(symbol);
 
-            // Return summary
             Map<String, Object> response = new HashMap<>();
             response.put("symbol", symbol);
             response.put("modelId", model.getId());
@@ -137,18 +119,12 @@ public class BackendTestController {
             return ResponseEntity.internalServerError().body(response);
         }
     }
-
-    /**
-     * Test endpoint to make predictions
-     */
     @GetMapping("/predict/{symbol}")
     public ResponseEntity<Map<String, Object>> predict(@PathVariable String symbol) {
         try {
-            // Make prediction
             List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(symbol);
             StockPrediction prediction = predictions.get(0);
 
-            // Return summary
             Map<String, Object> response = new HashMap<>();
             response.put("symbol", symbol);
             response.put("currentPrice", prediction.getCurrentPrice());
@@ -167,21 +143,15 @@ public class BackendTestController {
             return ResponseEntity.internalServerError().body(response);
         }
     }
-
-    /**
-     * Test endpoint to check what's stored in the database
-     */
     @GetMapping("/database-status")
     public ResponseEntity<Map<String, Object>> databaseStatus() {
         Map<String, Object> status = new HashMap<>();
 
-        // Count documents in each collection
         status.put("stockDataCount", stockDataRepository.count());
         status.put("technicalIndicatorCount", technicalIndicatorRepository.count());
         status.put("mlModelCount", mlModelRepository.count());
         status.put("stockPredictionCount", stockPredictionRepository.count());
 
-        // Get some sample data
         List<String> symbols = (List<String>) stockDataRepository.findDistinctSymbols();
         status.put("availableSymbols", symbols);
 
@@ -209,17 +179,12 @@ public class BackendTestController {
 
         return ResponseEntity.ok(status);
     }
-
-    /**
-     * Test the end-to-end flow for a given symbol
-     */
     @GetMapping("/end-to-end/{symbol}")
     public ResponseEntity<Map<String, Object>> endToEndTest(@PathVariable String symbol) {
         Map<String, Object> result = new HashMap<>();
         result.put("symbol", symbol);
 
         try {
-            // Step 1: Collect data
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusYears(2);
             List<StockData> data = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate);
@@ -229,14 +194,12 @@ public class BackendTestController {
                     "dataPointsCollected", data.size()
             ));
 
-            // Step 2: Calculate indicators
             List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(symbol, startDate, endDate);
             result.put("indicatorCalculation", Map.of(
                     "status", "success",
                     "indicatorsCalculated", indicators.size()
             ));
 
-            // Step 3: Train model
             MLModel model = neuralNetworkService.trainModelForStock(symbol);
             result.put("modelTraining", Map.of(
                     "status", "success",
@@ -244,7 +207,6 @@ public class BackendTestController {
                     "trainingError", model.getTrainingError()
             ));
 
-            // Step 4: Make predictions
             List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(symbol);
             StockPrediction prediction = predictions.get(0);
             result.put("prediction", Map.of(

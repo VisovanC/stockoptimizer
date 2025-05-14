@@ -7,9 +7,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
 
-/**
- * Entity for storing raw stock data from Yahoo Finance
- */
 @Document(collection = "stock_data")
 @CompoundIndexes({
         @CompoundIndex(name = "symbol_date_idx", def = "{'symbol': 1, 'date': 1}", unique = true)
@@ -27,7 +24,6 @@ public class StockData {
     private long volume;
     private double adjClose;
 
-    // Constructors
     public StockData() {
     }
 
@@ -39,7 +35,7 @@ public class StockData {
         this.low = low;
         this.close = close;
         this.volume = volume;
-        this.adjClose = close; // Default if not provided
+        this.adjClose = close;
     }
 
     public StockData(String symbol, LocalDate date, double open, double high, double low, double close, long volume, double adjClose) {
@@ -47,7 +43,6 @@ public class StockData {
         this.adjClose = adjClose;
     }
 
-    // Getters and setters
     public String getId() {
         return id;
     }

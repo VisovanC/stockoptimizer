@@ -26,7 +26,6 @@ public class HealthCheckController {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // Try to perform a simple operation
             String dbName = mongoTemplate.getDb().getName();
 
             response.put("status", "UP");

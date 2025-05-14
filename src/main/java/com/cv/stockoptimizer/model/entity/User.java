@@ -15,8 +15,6 @@ public class User {
     private String password;
     private Set<String> roles = new HashSet<>();
     private boolean enabled = true;
-
-    // Constructors
     public User() {
     }
 
@@ -25,8 +23,6 @@ public class User {
         this.email = email;
         this.password = password;
     }
-
-    // Getters and setters
     public String getId() {
         return id;
     }

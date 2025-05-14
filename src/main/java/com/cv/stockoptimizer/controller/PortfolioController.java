@@ -45,12 +45,10 @@ public class PortfolioController {
         Portfolio portfolio = portfolioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Portfolio not found"));
 
-        // Check if portfolio belongs to current user
         if (!portfolio.getUserId().equals(currentUserId)) {
             return ResponseEntity.status(403).body(null);
         }
 
-        // Get updated portfolio with current values
         Portfolio updatedPortfolio = optimizationService.getPortfolioWithCurrentValues(id);
 
         return ResponseEntity.ok(updatedPortfolio);
@@ -98,18 +96,12 @@ public class PortfolioController {
 
         Portfolio portfolio = portfolioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Portfolio not found"));
-
-        // Check if portfolio belongs to current user
         if (!portfolio.getUserId().equals(currentUserId)) {
             return ResponseEntity.status(403).body(null);
         }
-
-        // Update portfolio properties
         portfolio.setName(portfolioRequest.getName());
         portfolio.setDescription(portfolioRequest.getDescription());
         portfolio.setUpdatedAt(LocalDateTime.now());
-
-        // Update stocks
         if (portfolioRequest.getStocks() != null) {
             List<Portfolio.PortfolioStock> stocks = new ArrayList<>();
 
@@ -127,7 +119,6 @@ public class PortfolioController {
             portfolio.setStocks(stocks);
         }
 
-        // Reset optimization status
         portfolio.setOptimizationStatus("NOT_OPTIMIZED");
 
         Portfolio updatedPortfolio = portfolioRepository.save(portfolio);
@@ -142,7 +133,6 @@ public class PortfolioController {
         Portfolio portfolio = portfolioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Portfolio not found"));
 
-        // Check if portfolio belongs to current user
         if (!portfolio.getUserId().equals(currentUserId)) {
             return ResponseEntity.status(403).body(null);
         }
@@ -162,12 +152,10 @@ public class PortfolioController {
         Portfolio portfolio = portfolioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Portfolio not found"));
 
-        // Check if portfolio belongs to current user
         if (!portfolio.getUserId().equals(currentUserId)) {
             return ResponseEntity.status(403).body(null);
         }
 
-        // Start optimization process asynchronously
         optimizationService.optimizePortfolio(id, riskTolerance);
 
         Map<String, Object> response = new HashMap<>();
@@ -184,7 +172,6 @@ public class PortfolioController {
         Portfolio portfolio = portfolioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Portfolio not found"));
 
-        // Check if portfolio belongs to current user
         if (!portfolio.getUserId().equals(currentUserId)) {
             return ResponseEntity.status(403).body(null);
         }
@@ -203,7 +190,6 @@ public class PortfolioController {
         Portfolio portfolio = portfolioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Portfolio not found"));
 
-        // Check if portfolio belongs to current user
         if (!portfolio.getUserId().equals(currentUserId)) {
             return ResponseEntity.status(403).body(null);
         }
@@ -213,7 +199,6 @@ public class PortfolioController {
         return ResponseEntity.ok(suggestions);
     }
 
-    // Helper method to get current user ID
     private String getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getName();

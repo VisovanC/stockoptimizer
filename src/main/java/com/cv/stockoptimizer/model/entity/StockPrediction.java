@@ -3,9 +3,7 @@ package com.cv.stockoptimizer.model.entity;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.LocalDate; /**
- * Entity for storing stock price predictions
- */
+import java.time.LocalDate;
 @Document(collection = "stock_predictions")
 public class StockPrediction {
     @Id
@@ -21,8 +19,6 @@ public class StockPrediction {
     private Double actualPrice;
     private Double actualChangePercentage;
     private boolean verified;
-
-    // Getters and setters
     public String getId() {
         return id;
     }
