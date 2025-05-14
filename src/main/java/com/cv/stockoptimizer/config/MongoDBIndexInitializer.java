@@ -1,4 +1,4 @@
-/*package com.cv.stockoptimizer.config;
+package com.cv.stockoptimizer.config;
 
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,4 +57,4 @@ public class MongoDBIndexInitializer {
             e.printStackTrace();
         }
     }
-}*/
+}
