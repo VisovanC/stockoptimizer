@@ -39,6 +39,10 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
     testImplementation 'org.testng:testng:7.8.0'
+    implementation 'org.apache.commons:commons-math3:3.6.1'
+    implementation 'org.threeten:threeten-extra:1.7.2'
+    implementation 'com.github.h-thurow:simple-jndi:0.23.0'
+    implementation 'com.github.wendykierp:JTransforms:3.1'
 }
 
 tasks.named('test') {

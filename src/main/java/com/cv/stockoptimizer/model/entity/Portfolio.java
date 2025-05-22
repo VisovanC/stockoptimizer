@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Document(collection = "portfolios")
-public class Portfolio {
+public class Portfolio extends AuditableEntity{
     @Id
     private String id;
     private String userId;
@@ -23,6 +23,9 @@ public class Portfolio {
     private Double riskScore;
     private String optimizationStatus; // "NOT_OPTIMIZED", "OPTIMIZING", "OPTIMIZED"
     private LocalDateTime lastOptimizedAt;
+    private Boolean hasAiRecommendations = false;
+    private LocalDateTime lastAiRecommendationDate;
+    private String aiRecommendationType;
 
     public Portfolio() {
         this.createdAt = LocalDateTime.now();
@@ -120,6 +123,8 @@ public class Portfolio {
         public void setReturnPercentage(double returnPercentage) {
             this.returnPercentage = returnPercentage;
         }
+
+
     }
 
     public String getId() {

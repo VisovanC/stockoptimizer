@@ -9,5 +9,6 @@ import java.util.List;
 @Repository
 public interface PortfolioRepository extends MongoRepository<Portfolio, String> {
     List<Portfolio> findByUserId(String userId);
+    List<Portfolio> findByLastOptimizedAtBeforeOrLastOptimizedAtIsNull(LocalDateTime date);
     void deleteByUserIdAndId(String userId, String id);
 }
