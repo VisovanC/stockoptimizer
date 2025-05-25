@@ -20,35 +20,36 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'com.yahoofinance-api:YahooFinanceAPI:3.17.0'
     implementation 'org.encog:encog-core:3.4'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
     implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
     implementation 'io.jsonwebtoken:jjwt-jackson:0.11.5'
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
-    testImplementation 'org.testng:testng:7.8.0'
     implementation 'org.apache.commons:commons-math3:3.6.1'
     implementation 'org.threeten:threeten-extra:1.7.2'
     implementation 'com.github.h-thurow:simple-jndi:0.23.0'
     implementation 'com.github.wendykierp:JTransforms:3.1'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
+    testImplementation 'org.testng:testng:7.8.0'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
 }
 
-test{
+test {
+    useJUnitPlatform()
     useTestNG()
 }

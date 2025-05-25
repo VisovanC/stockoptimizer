@@ -161,7 +161,7 @@ public class PortfolioHistoryService {
      * Get AI recommendation history for a specific portfolio
      */
     public List<PortfolioHistory> getAiRecommendationHistory(String portfolioId) {
-        return historyRepository.findByPortfolioIdAndChangeTypesOrderByChangeDateDesc(
+        return historyRepository.findByPortfolioIdAndChangeTypeOrderByChangeDateDesc(
                 portfolioId, "AI_RECOMMENDATION");
     }
 

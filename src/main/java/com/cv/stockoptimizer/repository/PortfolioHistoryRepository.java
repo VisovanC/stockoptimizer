@@ -12,7 +12,7 @@ public interface PortfolioHistoryRepository extends MongoRepository<PortfolioHis
 
     List<PortfolioHistory> findByPortfolioIdOrderByChangeDateDesc(String portfolioId);
 
-    List<PortfolioHistory> findByPortfolioIdAndChangeTypesOrderByChangeDateDesc(
+    List<PortfolioHistory> findByPortfolioIdAndChangeTypeOrderByChangeDateDesc(
             String portfolioId, String changeType);
 
     List<PortfolioHistory> findByChangeDateBetweenOrderByChangeDateDesc(

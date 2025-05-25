@@ -1,7 +1,6 @@
-package com.cv.stockoptimizer.service.optimization;
+package com.cv.stockoptimizer;
 
 import com.cv.stockoptimizer.config.AIPortfolioConfig;
-import com.cv.stockoptimizer.model.entity.MLModel;
 import com.cv.stockoptimizer.model.entity.Portfolio;
 import com.cv.stockoptimizer.model.entity.StockData;
 import com.cv.stockoptimizer.model.entity.StockPrediction;
@@ -13,6 +12,7 @@ import com.cv.stockoptimizer.repository.StockPredictionRepository;
 import com.cv.stockoptimizer.repository.TechnicalIndicatorRepository;
 import com.cv.stockoptimizer.service.history.PortfolioHistoryService;
 import com.cv.stockoptimizer.service.ml.NeuralNetworkService;
+import com.cv.stockoptimizer.service.optimization.AIPortfolioUpgraderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
