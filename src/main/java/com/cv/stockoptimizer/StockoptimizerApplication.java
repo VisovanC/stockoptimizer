@@ -2,13 +2,13 @@ package com.cv.stockoptimizer;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-@EnableScheduling
 public class StockoptimizerApplication {
 
     public static void main(String[] args) {
+        System.out.println("Starting Stock Optimizer Application...");
         SpringApplication.run(StockoptimizerApplication.class, args);
+        System.out.println("Stock Optimizer Application started successfully!");
     }
 }

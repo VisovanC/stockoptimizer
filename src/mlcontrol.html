@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Optimizer ML Control</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+
+    .container {
+      background: white;
+      padding: 25px;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 30px;
+      font-size: 2.5em;
+    }
+
+    h2 {
+      color: #444;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 10px;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      padding: 15px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-primary {
+      background: linear-gradient(45deg, #667eea, #764ba2);
+      color: white;
+    }
+
+    .btn-success {
+      background: linear-gradient(45deg, #56ab2f, #a8e6cf);
+      color: white;
+    }
+
+    .btn-warning {
+      background: linear-gradient(45deg, #f093fb, #f5576c);
+      color: white;
+    }
+
+    .btn-info {
+      background: linear-gradient(45deg, #4facfe, #00f2fe);
+      color: white;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .result {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+      border-left: 4px solid #667eea;
+      white-space: pre-wrap;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .error {
+      border-left-color: #dc3545;
+      background-color: #fff5f5;
+      color: #721c24;
+    }
+
+    .success {
+      border-left-color: #28a745;
+      background-color: #f0fff4;
+      color: #155724;
+    }
+
+    .status-card {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .status-item {
+      text-align: center;
+      padding: 15px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+    }
+
+    .status-number {
+      font-size: 2em;
+      font-weight: bold;
+      display: block;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 10px;
+      background-color: #e0e0e0;
+      border-radius: 5px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+<h1>🤖 Stock Portfolio Optimizer - ML Control Center</h1>
+
+<!-- Status Dashboard -->
+<div class="container">
+  <h2>📊 System Status</h2>
+  <div class="status-card">
+    <div class="status-grid" id="statusGrid">
+      <div class="status-item">
+        <span class="status-number" id="stockDataCount">-</span>
+        <div>Stock Data Points</div>
+      </div>
+      <div class="status-item">
+        <span class="status-number" id="symbolsCount">-</span>
+        <div>Available Symbols</div>
+      </div>
+      <div class="status-item">
+        <span class="status-number" id="systemStatus">-</span>
+        <div>System Status</div>
+      </div>
+    </div>
+  </div>
+  <button class="btn-info" onclick="checkStatus()">🔄 Refresh Status</button>
+  <div id="statusResult" class="result" style="display:none;"></div>
+</div>
+
+<!-- Quick Start -->
+<div class="container">
+  <h2>🚀 Quick Start</h2>
+  <p>Start the complete ML pipeline with one click:</p>
+  <button class="btn-primary" onclick="runFullPipeline()" id="fullPipelineBtn">
+    🚀 Run Complete ML Pipeline
+  </button>
+  <div class="progress-bar" id="pipelineProgress" style="display:none;">
+    <div class="progress-fill" id="pipelineProgressFill"></div>
+  </div>
+  <div id="fullPipelineResult" class="result" style="display:none;"></div>
+</div>
+
+<!-- Individual Controls -->
+<div class="container">
+  <h2>🎛️ Individual Controls</h2>
+  <div class="button-grid">
+    <button class="btn-success" onclick="collectData()">
+      📈 Collect Stock Data
+    </button>
+    <button class="btn-warning" onclick="trainModels()">
+      🧠 Train ML Models
+    </button>
+    <button class="btn-info" onclick="generatePredictions()">
+      🔮 Generate Predictions
+    </button>
+  </div>
+
+  <div id="collectResult" class="result" style="display:none;"></div>
+  <div id="trainResult" class="result" style="display:none;"></div>
+  <div id="predictResult" class="result" style="display:none;"></div>
+</div>
+
+<!-- Logs -->
+<div class="container">
+  <h2>📋 Activity Log</h2>
+  <div id="activityLog" class="result">
+    System ready. Click 'Refresh Status' to check current state.
+  </div>
+</div>
+
+<script>
+  const API_BASE = 'http://localhost:8080/api';
+
+  function log(message) {
+    const logElement = document.getElementById('activityLog');
+    const timestamp = new Date().toLocaleTimeString();
+    logElement.textContent += `\n[${timestamp}] ${message}`;
+    logElement.scrollTop = logElement.scrollHeight;
+  }
+
+  function showResult(elementId, message, isError = false, isSuccess = false) {
+    const element = document.getElementById(elementId);
+    element.style.display = 'block';
+    element.className = `result ${isError ? 'error' : isSuccess ? 'success' : ''}`;
+    element.textContent = message;
+  }
+
+  function setButtonLoading(buttonId, loading) {
+    const button = document.getElementById(buttonId);
+    if (loading) {
+      button.innerHTML = '<div class="loading"></div>' + button.textContent;
+      button.disabled = true;
+    } else {
+      button.innerHTML = button.textContent.replace(/^.*?(\w)/, '$1');
+      button.disabled = false;
+    }
+  }
+
+  function updateProgress(percentage) {
+    const progressBar = document.getElementById('pipelineProgress');
+    const progressFill = document.getElementById('pipelineProgressFill');
+    progressBar.style.display = 'block';
+    progressFill.style.width = percentage + '%';
+  }
+
+  async function checkStatus() {
+    try {
+      log('Checking system status...');
+      const response = await fetch(`${API_BASE}/ml/status`);
+      const data = await response.json();
+
+      if (response.ok) {
+        document.getElementById('stockDataCount').textContent = data.stockDataCount || 0;
+        document.getElementById('symbolsCount').textContent = data.availableSymbolsCount || 0;
+        document.getElementById('systemStatus').textContent = data.ready ? '✅ Ready' : '⚠️ Not Ready';
+
+        showResult('statusResult', JSON.stringify(data, null, 2), false, true);
+        log('✓ Status updated successfully');
+      } else {
+        showResult('statusResult', `Error: ${data.message}`, true);
+        log('✗ Failed to get status');
+      }
+    } catch (error) {
+      showResult('statusResult', `Network Error: ${error.message}`, true);
+      log(`✗ Network error: ${error.message}`);
+    }
+  }
+
+  async function collectData() {
+    try {
+      log('Starting stock data collection...');
+      showResult('collectResult', 'Collecting stock data... This may take a few minutes.');
+
+      const response = await fetch(`${API_BASE}/ml/start-data-collection`, {
+        method: 'POST'
+      });
+      const data = await response.json();
+
+      if (response.ok && data.status === 'success') {
+        showResult('collectResult',
+                `✓ Data collection completed!\n` +
+                `Stocks processed: ${data.stocksProcessed}\n` +
+                `Successful: ${data.successfulStocks}\n` +
+                `Total data points: ${data.totalDataPoints}\n` +
+                `Symbols: ${data.collectedSymbols.join(', ')}`,
+                false, true);
+        log(`✓ Data collection completed: ${data.totalDataPoints} data points`);
+      } else {
+        showResult('collectResult', `Error: ${data.message}`, true);
+        log(`✗ Data collection failed: ${data.message}`);
+      }
+
+      await checkStatus(); // Refresh status
+    } catch (error) {
+      showResult('collectResult', `Network Error: ${error.message}`, true);
+      log(`✗ Data collection error: ${error.message}`);
+    }
+  }
+
+  async function trainModels() {
+    try {
+      log('Starting model training...');
+      showResult('trainResult', 'Training ML models... This may take several minutes.');
+
+      const response = await fetch(`${API_BASE}/ml/train-models`, {
+        method: 'POST'
+      });
+      const data = await response.json();
+
+      if (response.ok && data.status === 'success') {
+        showResult('trainResult',
+                `✓ Model training completed!\n` +
+                `Available symbols: ${data.availableSymbols}\n` +
+                `Trained models: ${data.trainedModels}\n` +
+                `Trained symbols: ${data.trainedSymbols.join(', ')}`,
+                false, true);
+        log(`✓ Model training completed: ${data.trainedModels} models`);
+      } else {
+        showResult('trainResult', `Error: ${data.message}`, true);
+        log(`✗ Model training failed: ${data.message}`);
+      }
+    } catch (error) {
+      showResult('trainResult', `Network Error: ${error.message}`, true);
+      log(`✗ Model training error: ${error.message}`);
+    }
+  }
+
+  async function generatePredictions() {
+    try {
+      log('Generating predictions...');
+      showResult('predictResult', 'Generating predictions...');
+
+      const response = await fetch(`${API_BASE}/ml/generate-predictions`, {
+        method: 'POST'
+      });
+      const data = await response.json();
+
+      if (response.ok && data.status === 'success') {
+        showResult('predictResult',
+                `✓ Prediction generation completed!\n` +
+                `Generated predictions: ${data.generatedPredictions}\n` +
+                `Predicted symbols: ${data.predictedSymbols.join(', ')}`,
+                false, true);
+        log(`✓ Predictions generated for ${data.generatedPredictions} symbols`);
+      } else {
+        showResult('predictResult', `Error: ${data.message}`, true);
+        log(`✗ Prediction generation failed: ${data.message}`);
+      }
+    } catch (error) {
+      showResult('predictResult', `Network Error: ${error.message}`, true);
+      log(`✗ Prediction generation error: ${error.message}`);
+    }
+  }
+
+  async function runFullPipeline() {
+    try {
+      log('🚀 Starting full ML pipeline...');
+      setButtonLoading('fullPipelineBtn', true);
+
+      updateProgress(10);
+      showResult('fullPipelineResult', 'Starting full ML pipeline...\nThis will take several minutes to complete.');
+
+      const response = await fetch(`${API_BASE}/ml/full-ml-pipeline`, {
+        method: 'POST'
+      });
+
+      updateProgress(100);
+      const data = await response.json();
+
+      if (response.ok && data.status === 'success') {
+        showResult('fullPipelineResult',
+                `🎉 Full ML Pipeline Completed Successfully!\n\n` +
+                `Data Collection:\n` +
+                `- Stocks processed: ${data.dataCollection.stocksProcessed}\n` +
+                `- Data points: ${data.dataCollection.totalDataPoints}\n\n` +
+                `Model Training:\n` +
+                `- Models trained: ${data.modelTraining.trainedModels}\n` +
+                `- Symbols: ${data.modelTraining.trainedSymbols.join(', ')}\n\n` +
+                `Predictions:\n` +
+                `- Generated for: ${data.predictionGeneration.generatedPredictions} symbols\n` +
+                `- Symbols: ${data.predictionGeneration.predictedSymbols.join(', ')}\n\n` +
+                `🎯 Your ML system is now ready for portfolio optimization!`,
+                false, true);
+        log('🎉 Full ML pipeline completed successfully!');
+      } else {
+        showResult('fullPipelineResult', `Error: ${data.message}`, true);
+        log(`✗ Full pipeline failed: ${data.message}`);
+      }
+
+      await checkStatus(); // Refresh status
+    } catch (error) {
+      showResult('fullPipelineResult', `Network Error: ${error.message}`, true);
+      log(`✗ Full pipeline error: ${error.message}`);
+    } finally {
+      setButtonLoading('fullPipelineBtn', false);
+      document.getElementById('pipelineProgress').style.display = 'none';
+    }
+  }
+
+  // Check status on page load
+  window.onload = function() {
+    checkStatus();
+    log('ML Control Center initialized');
+  };
+</script>
+</body>
+</html>
