@@ -74,6 +74,11 @@
       color: white;
     }
 
+    .btn-secondary {
+      background: linear-gradient(45deg, #868e96, #adb5bd);
+      color: white;
+    }
+
     button:hover {
       transform: translateY(-2px);
       box-shadow: 0 5px 15px rgba(0,0,0,0.2);
@@ -108,6 +113,12 @@
       border-left-color: #28a745;
       background-color: #f0fff4;
       color: #155724;
+    }
+
+    .warning {
+      border-left-color: #ffc107;
+      background-color: #fff9e6;
+      color: #856404;
     }
 
     .status-card {
@@ -168,10 +179,30 @@
       width: 0%;
       transition: width 0.3s ease;
     }
+
+    .alert {
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      font-weight: bold;
+    }
+
+    .alert-warning {
+      background-color: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
   </style>
 </head>
 <body>
 <h1>🤖 Stock Portfolio Optimizer - ML Control Center</h1>
+
+<!-- Rate Limit Warning -->
+<div class="container">
+  <div class="alert alert-warning">
+    ⚠️ Yahoo Finance may rate-limit requests. If data collection fails, use the "Sample Data" option below.
+  </div>
+</div>
 
 <!-- Status Dashboard -->
 <div class="container">
@@ -200,9 +231,14 @@
 <div class="container">
   <h2>🚀 Quick Start</h2>
   <p>Start the complete ML pipeline with one click:</p>
-  <button class="btn-primary" onclick="runFullPipeline()" id="fullPipelineBtn">
-    🚀 Run Complete ML Pipeline
-  </button>
+  <div class="button-grid">
+    <button class="btn-primary" onclick="runFullPipeline(false)" id="fullPipelineBtn">
+      🚀 Run ML Pipeline (Real Data)
+    </button>
+    <button class="btn-secondary" onclick="runFullPipeline(true)" id="fullPipelineSampleBtn">
+      🧪 Run ML Pipeline (Sample Data)
+    </button>
+  </div>
   <div class="progress-bar" id="pipelineProgress" style="display:none;">
     <div class="progress-fill" id="pipelineProgressFill"></div>
   </div>
@@ -213,8 +249,11 @@
 <div class="container">
   <h2>🎛️ Individual Controls</h2>
   <div class="button-grid">
-    <button class="btn-success" onclick="collectData()">
-      📈 Collect Stock Data
+    <button class="btn-success" onclick="collectData(false)">
+      📈 Collect Real Stock Data
+    </button>
+    <button class="btn-success" onclick="collectData(true)">
+      🧪 Generate Sample Data
     </button>
     <button class="btn-warning" onclick="trainModels()">
       🧠 Train ML Models
@@ -247,10 +286,10 @@
     logElement.scrollTop = logElement.scrollHeight;
   }
 
-  function showResult(elementId, message, isError = false, isSuccess = false) {
+  function showResult(elementId, message, isError = false, isSuccess = false, isWarning = false) {
     const element = document.getElementById(elementId);
     element.style.display = 'block';
-    element.className = `result ${isError ? 'error' : isSuccess ? 'success' : ''}`;
+    element.className = `result ${isError ? 'error' : isSuccess ? 'success' : isWarning ? 'warning' : ''}`;
     element.textContent = message;
   }
 
@@ -295,12 +334,15 @@
     }
   }
 
-  async function collectData() {
+  async function collectData(useSampleData = false) {
     try {
-      log('Starting stock data collection...');
-      showResult('collectResult', 'Collecting stock data... This may take a few minutes.');
+      log(`Starting stock data collection (${useSampleData ? 'sample data' : 'real data'})...`);
+      showResult('collectResult',
+              useSampleData
+                      ? 'Generating sample stock data...'
+                      : 'Collecting real stock data... This may take a few minutes.');
 
-      const response = await fetch(`${API_BASE}/ml/start-data-collection`, {
+      const response = await fetch(`${API_BASE}/ml/start-data-collection?useSampleData=${useSampleData}`, {
         method: 'POST'
       });
       const data = await response.json();
@@ -308,6 +350,7 @@
       if (response.ok && data.status === 'success') {
         showResult('collectResult',
                 `✓ Data collection completed!\n` +
+                `Mode: ${useSampleData ? 'Sample Data' : 'Real Data'}\n` +
                 `Stocks processed: ${data.stocksProcessed}\n` +
                 `Successful: ${data.successfulStocks}\n` +
                 `Total data points: ${data.totalDataPoints}\n` +
@@ -381,47 +424,81 @@
     }
   }
 
-  async function runFullPipeline() {
+  async function runFullPipeline(useSampleData = false) {
     try {
-      log('🚀 Starting full ML pipeline...');
-      setButtonLoading('fullPipelineBtn', true);
+      log(`🚀 Starting full ML pipeline (${useSampleData ? 'sample data' : 'real data'})...`);
+      setButtonLoading(useSampleData ? 'fullPipelineSampleBtn' : 'fullPipelineBtn', true);
 
       updateProgress(10);
-      showResult('fullPipelineResult', 'Starting full ML pipeline...\nThis will take several minutes to complete.');
+      showResult('fullPipelineResult',
+              `Starting full ML pipeline with ${useSampleData ? 'sample' : 'real'} data...\n` +
+              'This will take several minutes to complete.');
 
-      const response = await fetch(`${API_BASE}/ml/full-ml-pipeline`, {
+      // Step 1: Data Collection
+      updateProgress(20);
+      log('Step 1: Collecting data...');
+      const dataResponse = await fetch(`${API_BASE}/ml/start-data-collection?useSampleData=${useSampleData}`, {
         method: 'POST'
       });
+      const dataCollection = await dataResponse.json();
+
+      if (dataCollection.status !== 'success') {
+        throw new Error(`Data collection failed: ${dataCollection.message}`);
+      }
+
+      // Step 2: Model Training
+      updateProgress(50);
+      log('Step 2: Training models...');
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Brief pause
+
+      const trainResponse = await fetch(`${API_BASE}/ml/train-models`, {
+        method: 'POST'
+      });
+      const modelTraining = await trainResponse.json();
+
+      if (modelTraining.status !== 'success') {
+        throw new Error(`Model training failed: ${modelTraining.message}`);
+      }
+
+      // Step 3: Prediction Generation
+      updateProgress(80);
+      log('Step 3: Generating predictions...');
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Brief pause
+
+      const predictResponse = await fetch(`${API_BASE}/ml/generate-predictions`, {
+        method: 'POST'
+      });
+      const predictionGeneration = await predictResponse.json();
 
       updateProgress(100);
-      const data = await response.json();
 
-      if (response.ok && data.status === 'success') {
+      if (predictionGeneration.status === 'success') {
         showResult('fullPipelineResult',
                 `🎉 Full ML Pipeline Completed Successfully!\n\n` +
+                `Mode: ${useSampleData ? 'Sample Data' : 'Real Data'}\n\n` +
                 `Data Collection:\n` +
-                `- Stocks processed: ${data.dataCollection.stocksProcessed}\n` +
-                `- Data points: ${data.dataCollection.totalDataPoints}\n\n` +
+                `- Stocks processed: ${dataCollection.stocksProcessed}\n` +
+                `- Data points: ${dataCollection.totalDataPoints}\n\n` +
                 `Model Training:\n` +
-                `- Models trained: ${data.modelTraining.trainedModels}\n` +
-                `- Symbols: ${data.modelTraining.trainedSymbols.join(', ')}\n\n` +
+                `- Models trained: ${modelTraining.trainedModels}\n` +
+                `- Symbols: ${modelTraining.trainedSymbols.join(', ')}\n\n` +
                 `Predictions:\n` +
-                `- Generated for: ${data.predictionGeneration.generatedPredictions} symbols\n` +
-                `- Symbols: ${data.predictionGeneration.predictedSymbols.join(', ')}\n\n` +
+                `- Generated for: ${predictionGeneration.generatedPredictions} symbols\n` +
+                `- Symbols: ${predictionGeneration.predictedSymbols.join(', ')}\n\n` +
                 `🎯 Your ML system is now ready for portfolio optimization!`,
                 false, true);
         log('🎉 Full ML pipeline completed successfully!');
       } else {
-        showResult('fullPipelineResult', `Error: ${data.message}`, true);
-        log(`✗ Full pipeline failed: ${data.message}`);
+        throw new Error(`Prediction generation failed: ${predictionGeneration.message}`);
       }
 
       await checkStatus(); // Refresh status
     } catch (error) {
-      showResult('fullPipelineResult', `Network Error: ${error.message}`, true);
-      log(`✗ Full pipeline error: ${error.message}`);
+      showResult('fullPipelineResult', `Error: ${error.message}`, true);
+      log(`✗ Full pipeline failed: ${error.message}`);
     } finally {
       setButtonLoading('fullPipelineBtn', false);
+      setButtonLoading('fullPipelineSampleBtn', false);
       document.getElementById('pipelineProgress').style.display = 'none';
     }
   }
@@ -430,6 +507,11 @@
   window.onload = function() {
     checkStatus();
     log('ML Control Center initialized');
+
+    // Show warning if needed
+    if (window.location.protocol === 'file:') {
+      log('⚠️ Running from file:// protocol. Some features may be limited.');
+    }
   };
 </script>
 </body>

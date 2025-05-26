@@ -40,7 +40,7 @@ public class NeuralNetworkService {
     private static final int PREDICTION_DAYS = 5; // Number of days to predict ahead
     private static final int HIDDEN_NEURONS = 50; // Number of neurons in hidden layer
     private static final double MAX_ERROR = 0.01; // Training stops when error reaches this value
-    private static final int MAX_EPOCHS = 5000; // Maximum training epochs
+    private static final int MAX_EPOCHS = 1000; // Reduced for faster training
     private static final String MODEL_DIRECTORY = "models/";
 
     @Autowired
@@ -54,76 +54,94 @@ public class NeuralNetworkService {
         // Create models directory if it doesn't exist
         File directory = new File(MODEL_DIRECTORY);
         if (!directory.exists()) {
-            directory.mkdirs();
+            boolean created = directory.mkdirs();
+            System.out.println("Models directory created: " + created);
         }
     }
 
     /**
      * Prepare data for neural network training
-     *
-     * @param symbol Stock symbol
-     * @param from Start date
-     * @param to End date
-     * @return Prepared MLDataSet for training
      */
     public MLDataSet prepareTrainingData(String symbol, LocalDate from, LocalDate to) {
         // Fetch technical indicators for the given period
         List<TechnicalIndicator> indicators = technicalIndicatorRepository
                 .findBySymbolAndDateBetweenOrderByDateAsc(symbol, from, to);
 
+        System.out.println("Found " + indicators.size() + " indicators for " + symbol);
+
         if (indicators.size() < INPUT_WINDOW + PREDICTION_DAYS) {
-            throw new IllegalArgumentException("Not enough data to prepare training set");
+            throw new IllegalArgumentException("Not enough data to prepare training set. Need at least " +
+                    (INPUT_WINDOW + PREDICTION_DAYS) + " data points, but only have " + indicators.size());
         }
 
         // Prepare data pairs (input -> output)
-        List<MLDataPair> pairs = new ArrayList<>();
+        MLDataSet dataSet = new BasicMLDataSet();
+        int validPairs = 0;
 
         // For each possible starting point in our time series
-        for (int i = 0; i < indicators.size() - INPUT_WINDOW - PREDICTION_DAYS; i++) {
-            // Extract features for this window
-            double[] input = new double[INPUT_WINDOW * 10]; // 10 features per day
-            int inputIndex = 0;
+        for (int i = 0; i <= indicators.size() - INPUT_WINDOW - PREDICTION_DAYS; i++) {
+            try {
+                // Extract features for this window
+                double[] input = new double[INPUT_WINDOW * 10]; // 10 features per day
+                int inputIndex = 0;
 
-            // Fill input vector with technical indicators for INPUT_WINDOW days
-            for (int j = i; j < i + INPUT_WINDOW; j++) {
-                TechnicalIndicator indicator = indicators.get(j);
-
-                // Normalize price data by dividing by the first price in the window
+                // Check if we have valid data for this window
+                boolean hasValidData = true;
                 double basePrice = indicators.get(i).getPrice();
 
-                // Add features: relative price, SMA20, SMA50, SMA200, RSI, MACD, Bollinger
-                input[inputIndex++] = indicator.getPrice() / basePrice;
-                input[inputIndex++] = indicator.getSma20() != null ? indicator.getSma20() / basePrice : 1.0;
-                input[inputIndex++] = indicator.getSma50() != null ? indicator.getSma50() / basePrice : 1.0;
-                input[inputIndex++] = indicator.getSma200() != null ? indicator.getSma200() / basePrice : 1.0;
-                input[inputIndex++] = indicator.getRsi14() != null ? indicator.getRsi14() / 100.0 : 0.5; // Normalize RSI to 0-1
-                input[inputIndex++] = indicator.getMacdLine() != null ? indicator.getMacdLine() / basePrice : 0.0;
-                input[inputIndex++] = indicator.getMacdSignal() != null ? indicator.getMacdSignal() / basePrice : 0.0;
-                input[inputIndex++] = indicator.getMacdHistogram() != null ? indicator.getMacdHistogram() / basePrice : 0.0;
-                input[inputIndex++] = indicator.getBollingerUpper() != null ? indicator.getBollingerUpper() / basePrice : 1.0;
-                input[inputIndex++] = indicator.getBollingerLower() != null ? indicator.getBollingerLower() / basePrice : 1.0;
+                if (basePrice <= 0) {
+                    continue; // Skip if base price is invalid
+                }
+
+                // Fill input vector with technical indicators for INPUT_WINDOW days
+                for (int j = i; j < i + INPUT_WINDOW; j++) {
+                    TechnicalIndicator indicator = indicators.get(j);
+
+                    // Normalize price data by dividing by the first price in the window
+                    input[inputIndex++] = indicator.getPrice() / basePrice;
+                    input[inputIndex++] = indicator.getSma20() != null ? indicator.getSma20() / basePrice : 1.0;
+                    input[inputIndex++] = indicator.getSma50() != null ? indicator.getSma50() / basePrice : 1.0;
+                    input[inputIndex++] = indicator.getSma200() != null ? indicator.getSma200() / basePrice : 1.0;
+                    input[inputIndex++] = indicator.getRsi14() != null ? indicator.getRsi14() / 100.0 : 0.5;
+                    input[inputIndex++] = indicator.getMacdLine() != null ? indicator.getMacdLine() / basePrice : 0.0;
+                    input[inputIndex++] = indicator.getMacdSignal() != null ? indicator.getMacdSignal() / basePrice : 0.0;
+                    input[inputIndex++] = indicator.getMacdHistogram() != null ? indicator.getMacdHistogram() / basePrice : 0.0;
+                    input[inputIndex++] = indicator.getBollingerUpper() != null ? indicator.getBollingerUpper() / basePrice : 1.0;
+                    input[inputIndex++] = indicator.getBollingerLower() != null ? indicator.getBollingerLower() / basePrice : 1.0;
+                }
+
+                // Output is the price change for the next PREDICTION_DAYS days
+                double futurePrice = indicators.get(i + INPUT_WINDOW + PREDICTION_DAYS - 1).getPrice();
+                double currentPrice = indicators.get(i + INPUT_WINDOW - 1).getPrice();
+
+                if (currentPrice <= 0) {
+                    continue; // Skip if current price is invalid
+                }
+
+                double priceChange = (futurePrice - currentPrice) / currentPrice;
+
+                // Clip extreme values
+                priceChange = Math.max(-0.5, Math.min(0.5, priceChange));
+
+                // Normalize to the range [-1, 1] using tanh-like scaling
+                double normalizedPriceChange = Math.tanh(priceChange * 2);
+
+                double[] output = new double[1];
+                output[0] = normalizedPriceChange;
+
+                // Create a data pair and add to the dataset
+                MLDataPair pair = new BasicMLDataPair(new BasicMLData(input), new BasicMLData(output));
+                dataSet.add(pair);
+                validPairs++;
+            } catch (Exception e) {
+                System.err.println("Error creating data pair at index " + i + ": " + e.getMessage());
             }
-
-            // Output is the price change for the next PREDICTION_DAYS days
-            double futurePrice = indicators.get(i + INPUT_WINDOW + PREDICTION_DAYS - 1).getPrice();
-            double currentPrice = indicators.get(i + INPUT_WINDOW - 1).getPrice();
-            double priceChange = (futurePrice - currentPrice) / currentPrice; // Percentage change
-
-            // Normalize to the range [-1, 1] using tanh-like scaling
-            double normalizedPriceChange = Math.tanh(priceChange * 2); // Scale factor of 2 can be adjusted
-
-            double[] output = new double[1];
-            output[0] = normalizedPriceChange;
-
-            // Create a data pair and add to the list
-            MLDataPair pair = new BasicMLDataPair(new BasicMLData(input), new BasicMLData(output));
-            pairs.add(pair);
         }
 
-        // Convert to Encog's MLDataSet
-        MLDataSet dataSet = new BasicMLDataSet();
-        for (MLDataPair pair : pairs) {
-            dataSet.add(pair);
+        System.out.println("Created " + validPairs + " valid training pairs for " + symbol);
+
+        if (validPairs < 10) {
+            throw new IllegalArgumentException("Not enough valid training pairs. Need at least 10, but only created " + validPairs);
         }
 
         return dataSet;
@@ -131,8 +149,6 @@ public class NeuralNetworkService {
 
     /**
      * Create a new neural network for price prediction
-     *
-     * @return Configured but untrained neural network
      */
     public BasicNetwork createNetwork() {
         BasicNetwork network = new BasicNetwork();
@@ -144,7 +160,7 @@ public class NeuralNetworkService {
         network.addLayer(new BasicLayer(new ActivationTANH(), true, HIDDEN_NEURONS));
         network.addLayer(new BasicLayer(new ActivationTANH(), true, HIDDEN_NEURONS / 2));
 
-        // Output layer: predicted price change for PREDICTION_DAYS ahead
+        // Output layer: predicted price change
         network.addLayer(new BasicLayer(new ActivationTANH(), false, 1));
 
         // Finalize the network structure
@@ -156,10 +172,6 @@ public class NeuralNetworkService {
 
     /**
      * Train a neural network with the prepared data
-     *
-     * @param network Neural network to train
-     * @param training Training data set
-     * @return Training error achieved
      */
     public double trainNetwork(BasicNetwork network, MLDataSet training) {
         // Create training algorithm
@@ -169,7 +181,9 @@ public class NeuralNetworkService {
         double error = 1.0;
         int epoch = 1;
 
-        while (error > MAX_ERROR && epoch < MAX_EPOCHS) {
+        System.out.println("Starting training with " + training.size() + " samples...");
+
+        while (error > MAX_ERROR && epoch <= MAX_EPOCHS) {
             train.iteration();
             error = train.getError();
 
@@ -182,34 +196,58 @@ public class NeuralNetworkService {
 
         train.finishTraining();
 
-        System.out.println("Training complete. Final error: " + error);
+        System.out.println("Training complete after " + epoch + " epochs. Final error: " + error);
         return error;
     }
 
     /**
      * Train model for a specific stock
-     *
-     * @param symbol Stock symbol
-     * @return Trained model information
      */
     public MLModel trainModelForStock(String symbol) throws IOException {
+        System.out.println("Starting model training for " + symbol);
+
+        // Check if model already exists
+        Optional<MLModel> existingModel = mlModelRepository.findBySymbol(symbol);
+        if (existingModel.isPresent()) {
+            System.out.println("Found existing model for " + symbol + ", retraining...");
+        }
+
         // Prepare dates for training data
         LocalDate today = LocalDate.now();
-        LocalDate trainStart = today.minusYears(5); // 5 years of training data
+        LocalDate trainStart = today.minusYears(2); // Reduced from 5 years for faster training
 
         // Prepare data
-        MLDataSet trainingData = prepareTrainingData(symbol, trainStart, today);
+        MLDataSet trainingData;
+        try {
+            trainingData = prepareTrainingData(symbol, trainStart, today);
+        } catch (Exception e) {
+            System.err.println("Error preparing training data: " + e.getMessage());
+            throw new IOException("Failed to prepare training data for " + symbol + ": " + e.getMessage());
+        }
 
         // Create and train the network
         BasicNetwork network = createNetwork();
-        double error = trainNetwork(network, trainingData);
+        double error;
+        try {
+            error = trainNetwork(network, trainingData);
+        } catch (Exception e) {
+            System.err.println("Error training network: " + e.getMessage());
+            throw new IOException("Failed to train network for " + symbol + ": " + e.getMessage());
+        }
 
         // Save the network
         String modelFilePath = MODEL_DIRECTORY + symbol + "_model.eg";
-        EncogDirectoryPersistence.saveObject(new File(modelFilePath), network);
+        try {
+            File modelFile = new File(modelFilePath);
+            EncogDirectoryPersistence.saveObject(modelFile, network);
+            System.out.println("Model saved to " + modelFilePath);
+        } catch (Exception e) {
+            System.err.println("Error saving model: " + e.getMessage());
+            throw new IOException("Failed to save model for " + symbol + ": " + e.getMessage());
+        }
 
-        // Save model metadata to MongoDB
-        MLModel model = new MLModel();
+        // Save or update model metadata in MongoDB
+        MLModel model = existingModel.orElse(new MLModel());
         model.setSymbol(symbol);
         model.setModelType("PRICE_PREDICTION");
         model.setInputWindow(INPUT_WINDOW);
@@ -222,14 +260,14 @@ public class NeuralNetworkService {
                 "MACD_LINE", "MACD_SIGNAL", "MACD_HISTOGRAM",
                 "BOLLINGER_UPPER", "BOLLINGER_LOWER"));
 
-        return mlModelRepository.save(model);
+        MLModel savedModel = mlModelRepository.save(model);
+        System.out.println("Model metadata saved for " + symbol);
+
+        return savedModel;
     }
 
     /**
      * Load a trained model for a given stock
-     *
-     * @param symbol Stock symbol
-     * @return Loaded neural network
      */
     public BasicNetwork loadModel(String symbol) throws IOException {
         MLModel modelInfo = mlModelRepository.findBySymbol(symbol)
@@ -240,29 +278,33 @@ public class NeuralNetworkService {
             throw new IOException("Model file not found: " + modelInfo.getModelFilePath());
         }
 
-        return (BasicNetwork) EncogDirectoryPersistence.loadObject(modelFile);
+        try {
+            return (BasicNetwork) EncogDirectoryPersistence.loadObject(modelFile);
+        } catch (Exception e) {
+            throw new IOException("Failed to load model for " + symbol + ": " + e.getMessage());
+        }
     }
 
     /**
      * Make predictions for the future price movements
-     *
-     * @param symbol Stock symbol
-     * @return Prediction results
      */
     public List<StockPrediction> predictFuturePrices(String symbol) throws IOException {
+        System.out.println("Generating predictions for " + symbol);
+
         // Load the model
         BasicNetwork network = loadModel(symbol);
 
         // Get the most recent data for prediction
         LocalDate today = LocalDate.now();
-        LocalDate startDate = today.minusDays(INPUT_WINDOW + 10); // Add buffer for weekends/holidays
+        LocalDate startDate = today.minusDays(INPUT_WINDOW + 10); // Add buffer
 
         List<TechnicalIndicator> recentData = technicalIndicatorRepository
                 .findBySymbolAndDateBetweenOrderByDateAsc(symbol, startDate, today);
 
         // Ensure we have enough data
         if (recentData.size() < INPUT_WINDOW) {
-            throw new IllegalArgumentException("Not enough recent data for prediction");
+            throw new IllegalArgumentException("Not enough recent data for prediction. Need " +
+                    INPUT_WINDOW + " days, but only have " + recentData.size());
         }
 
         // Extract the last INPUT_WINDOW days of data
@@ -275,6 +317,10 @@ public class NeuralNetworkService {
 
         // Base price for normalization
         double basePrice = inputWindow.get(0).getPrice();
+
+        if (basePrice <= 0) {
+            throw new IllegalArgumentException("Invalid base price for prediction: " + basePrice);
+        }
 
         // Fill input vector
         for (TechnicalIndicator indicator : inputWindow) {
@@ -299,7 +345,7 @@ public class NeuralNetworkService {
 
         // Convert the output back to a price change percentage
         double normalizedPrediction = output.getData(0);
-        double predictedChangePercentage = Math.tanh(normalizedPrediction) / 2; // Reverse the tanh scaling
+        double predictedChangePercentage = Math.atan(normalizedPrediction) / 2; // Reverse the tanh scaling
 
         // Calculate predicted price
         double predictedPrice = currentPrice * (1 + predictedChangePercentage);
@@ -311,30 +357,27 @@ public class NeuralNetworkService {
         prediction.setTargetDate(today.plusDays(PREDICTION_DAYS));
         prediction.setCurrentPrice(currentPrice);
         prediction.setPredictedPrice(predictedPrice);
-        prediction.setPredictedChangePercentage(predictedChangePercentage * 100); // Convert to percentage
+        prediction.setPredictedChangePercentage(predictedChangePercentage * 100);
         prediction.setConfidenceScore(calculateConfidenceScore(normalizedPrediction));
 
         // Save and return the prediction
-        return Collections.singletonList(stockPredictionRepository.save(prediction));
+        StockPrediction savedPrediction = stockPredictionRepository.save(prediction);
+        System.out.println("Prediction saved for " + symbol + ": " +
+                String.format("%.2f%%", predictedChangePercentage * 100));
+
+        return Collections.singletonList(savedPrediction);
     }
 
     /**
      * Calculate a confidence score based on the model output
-     *
-     * @param normalizedPrediction The normalized output from the neural network
-     * @return Confidence score (0-100)
      */
     private double calculateConfidenceScore(double normalizedPrediction) {
         // Simple confidence calculation based on the distance from zero
-        // (outputs closer to -1 or 1 are considered more confident)
-        return Math.abs(normalizedPrediction) * 100;
+        return Math.min(100, Math.abs(normalizedPrediction) * 100);
     }
 
     /**
      * Create and train models for multiple stocks
-     *
-     * @param symbols List of stock symbols to train models for
-     * @return Map of symbols to training results
      */
     public Map<String, MLModel> trainModelsForMultipleStocks(List<String> symbols) {
         Map<String, MLModel> results = new HashMap<>();
@@ -346,114 +389,10 @@ public class NeuralNetworkService {
                 System.out.println("Successfully trained model for " + symbol);
             } catch (Exception e) {
                 System.err.println("Error training model for " + symbol + ": " + e.getMessage());
+                e.printStackTrace();
             }
         }
 
         return results;
-    }
-
-    /**
-     * Evaluate model accuracy using historical data
-     *
-     * @param symbol Stock symbol
-     * @param startDate Start date for evaluation
-     * @param endDate End date for evaluation
-     * @return Evaluation metrics
-     */
-    public Map<String, Double> evaluateModel(String symbol, LocalDate startDate, LocalDate endDate) throws IOException {
-        // Load the model
-        BasicNetwork network = loadModel(symbol);
-
-        // Get historical data for the evaluation period
-        List<TechnicalIndicator> historicalData = technicalIndicatorRepository
-                .findBySymbolAndDateBetweenOrderByDateAsc(symbol, startDate.minusDays(INPUT_WINDOW), endDate);
-
-        if (historicalData.size() < INPUT_WINDOW + 10) {
-            throw new IllegalArgumentException("Not enough historical data for evaluation");
-        }
-
-        // Prepare evaluation metrics
-        double totalError = 0.0;
-        int correctDirectionCount = 0;
-        int totalPredictions = 0;
-
-        // For each possible starting point in our evaluation period
-        for (int i = 0; i <= historicalData.size() - INPUT_WINDOW - PREDICTION_DAYS; i++) {
-            // Prepare input data
-            double[] input = new double[INPUT_WINDOW * 10];
-            int inputIndex = 0;
-
-            // Base price for normalization
-            double basePrice = historicalData.get(i).getPrice();
-
-            // Fill input vector
-            for (int j = i; j < i + INPUT_WINDOW; j++) {
-                TechnicalIndicator indicator = historicalData.get(j);
-                input[inputIndex++] = indicator.getPrice() / basePrice;
-                input[inputIndex++] = indicator.getSma20() != null ? indicator.getSma20() / basePrice : 1.0;
-                input[inputIndex++] = indicator.getSma50() != null ? indicator.getSma50() / basePrice : 1.0;
-                input[inputIndex++] = indicator.getSma200() != null ? indicator.getSma200() / basePrice : 1.0;
-                input[inputIndex++] = indicator.getRsi14() != null ? indicator.getRsi14() / 100.0 : 0.5;
-                input[inputIndex++] = indicator.getMacdLine() != null ? indicator.getMacdLine() / basePrice : 0.0;
-                input[inputIndex++] = indicator.getMacdSignal() != null ? indicator.getMacdSignal() / basePrice : 0.0;
-                input[inputIndex++] = indicator.getMacdHistogram() != null ? indicator.getMacdHistogram() / basePrice : 0.0;
-                input[inputIndex++] = indicator.getBollingerUpper() != null ? indicator.getBollingerUpper() / basePrice : 1.0;
-                input[inputIndex++] = indicator.getBollingerLower() != null ? indicator.getBollingerLower() / basePrice : 1.0;
-            }
-
-            // Get actual prices
-            double currentPrice = historicalData.get(i + INPUT_WINDOW - 1).getPrice();
-            double futurePrice = historicalData.get(i + INPUT_WINDOW + PREDICTION_DAYS - 1).getPrice();
-            double actualChange = (futurePrice - currentPrice) / currentPrice;
-
-            // Run the neural network
-            MLData inputData = new BasicMLData(input);
-            MLData output = network.compute(inputData);
-
-            // Convert the output back to a price change
-            double normalizedPrediction = output.getData(0);
-            double predictedChange = Math.tanh(normalizedPrediction) / 2;
-
-            // Calculate error (Mean Absolute Percentage Error)
-            double error = Math.abs(predictedChange - actualChange);
-            totalError += error;
-
-            // Check if prediction direction was correct
-            if ((predictedChange > 0 && actualChange > 0) || (predictedChange < 0 && actualChange < 0)) {
-                correctDirectionCount++;
-            }
-
-            totalPredictions++;
-        }
-
-        // Calculate average metrics
-        double meanAbsoluteError = totalError / totalPredictions;
-        double directionAccuracy = (double) correctDirectionCount / totalPredictions * 100.0;
-
-        // Return evaluation metrics
-        Map<String, Double> metrics = new HashMap<>();
-        metrics.put("meanAbsoluteError", meanAbsoluteError);
-        metrics.put("directionAccuracy", directionAccuracy);
-        metrics.put("totalPredictions", (double) totalPredictions);
-
-        return metrics;
-    }
-
-    /**
-     * Retrain models periodically to include the latest market data
-     */
-    //@Scheduled(cron = "0 0 2 * * SUN") // Run at 2 AM every Sunday
-    public void retrainAllModels() {
-        // Get all existing models
-        List<MLModel> existingModels = mlModelRepository.findAll();
-
-        for (MLModel model : existingModels) {
-            try {
-                trainModelForStock(model.getSymbol());
-                System.out.println("Successfully retrained model for " + model.getSymbol());
-            } catch (Exception e) {
-                System.err.println("Error retraining model for " + model.getSymbol() + ": " + e.getMessage());
-            }
-        }
     }
 }

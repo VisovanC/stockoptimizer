@@ -22,6 +22,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/test")
+@CrossOrigin(origins = "*")
 public class BackendTestController {
 
     private final MarketDataCollectorService dataCollectorService;
@@ -48,6 +49,15 @@ public class BackendTestController {
         this.technicalIndicatorRepository = technicalIndicatorRepository;
         this.mlModelRepository = mlModelRepository;
         this.stockPredictionRepository = stockPredictionRepository;
+    }
+
+    @GetMapping("/ping")
+    public ResponseEntity<Map<String, Object>> ping() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "pong");
+        response.put("timestamp", System.currentTimeMillis());
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/collect-data/{symbol}")
