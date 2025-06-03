@@ -76,6 +76,13 @@ public class StockServiceRunner implements CommandLineRunner {
         // trainModelsForUserPortfolio("userId123");
 
         System.out.println("StockServiceRunner completed");
+        System.out.println("StockServiceRunner: Automatic initialization disabled.");
+        System.out.println("Data collection is now user-specific through API endpoints.");
+
+        // Optional: Just print current status
+        System.out.println("Current system status:");
+       // System.out.println("- Total users: " + userRepository.count());
+        System.out.println("- Total portfolios: " + portfolioRepository.count());
     }
 
     private String getCurrentUserId() {
@@ -138,7 +145,7 @@ public class StockServiceRunner implements CommandLineRunner {
 
                 // Calculate all technical indicators
                 List<TechnicalIndicator> indicators = indicatorService
-                        .calculateAllIndicators(symbol, startDate, endDate);
+                        .calculateAllIndicators(symbol, startDate, endDate, getCurrentUserId());
 
                 System.out.println("Successfully calculated " + indicators.size() +
                         " indicators for " + symbol);
@@ -179,7 +186,7 @@ public class StockServiceRunner implements CommandLineRunner {
                 System.out.println("Training model for " + symbol + "...");
 
                 // Train the neural network model
-                MLModel model = neuralNetworkService.trainModelForStock(symbol);
+                MLModel model = neuralNetworkService.trainModelForStock(getCurrentUserId(), symbol);
 
                 System.out.println("Successfully trained model for " + symbol + ":");
                 System.out.println("  Model ID: " + model.getId());
@@ -212,7 +219,7 @@ public class StockServiceRunner implements CommandLineRunner {
 
                 // Generate predictions
                 List<StockPrediction> predictions =
-                        neuralNetworkService.predictFuturePrices(symbol);
+                        neuralNetworkService.predictFuturePrices(symbol, getCurrentUserId());
 
                 if (!predictions.isEmpty()) {
                     StockPrediction prediction = predictions.get(0);
@@ -254,7 +261,7 @@ public class StockServiceRunner implements CommandLineRunner {
             LocalDate startDate = endDate.minusYears(2);
 
             List<StockData> data = dataCollectorService.fetchHistoricalData(
-                    symbol, startDate, endDate);
+                    symbol, startDate, endDate, getCurrentUserId());
             stockDataRepository.saveAll(data);
 
             System.out.println("Collected " + data.size() + " data points");
@@ -262,7 +269,7 @@ public class StockServiceRunner implements CommandLineRunner {
             // Step 2: Calculate technical indicators
             System.out.println("Step 2: Calculating technical indicators...");
             List<TechnicalIndicator> indicators = indicatorService
-                    .calculateAllIndicators(symbol, startDate, endDate);
+                    .calculateAllIndicators(symbol, startDate, endDate, getCurrentUserId());
 
             System.out.println("Calculated " + indicators.size() + " indicators");
 
@@ -275,7 +282,7 @@ public class StockServiceRunner implements CommandLineRunner {
             // Step 4: Make predictions
             System.out.println("Step 4: Making predictions...");
             List<StockPrediction> predictions =
-                    neuralNetworkService.predictFuturePrices(symbol);
+                    neuralNetworkService.predictFuturePrices(symbol, getCurrentUserId());
 
             if (!predictions.isEmpty()) {
                 StockPrediction prediction = predictions.get(0);
@@ -355,19 +362,19 @@ public class StockServiceRunner implements CommandLineRunner {
 
                     // Check if we already have data
                     List<StockData> existingData = stockDataRepository
-                            .findBySymbolAndDateBetweenOrderByDateAsc(
-                                    symbol, startDate, endDate);
+                            .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(
+                                    getCurrentUserId() ,symbol, startDate, endDate);
 
                     if (existingData.size() < 100) { // Arbitrary threshold
                         System.out.println("Collecting data for " + symbol + "...");
                         List<StockData> newData = dataCollectorService
-                                .fetchHistoricalData(symbol, startDate, endDate);
+                                .fetchHistoricalData(symbol, startDate, endDate, getCurrentUserId());
                         stockDataRepository.saveAll(newData);
                     }
 
                     // Calculate indicators
                     System.out.println("Calculating indicators for " + symbol + "...");
-                    indicatorService.calculateAllIndicators(symbol, startDate, endDate);
+                    indicatorService.calculateAllIndicators(symbol, startDate, endDate, getCurrentUserId());
 
                     // Train model
                     System.out.println("Training model for " + symbol + "...");

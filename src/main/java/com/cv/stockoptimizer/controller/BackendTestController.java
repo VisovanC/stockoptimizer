@@ -173,11 +173,11 @@ public class BackendTestController {
             LocalDate startDate = endDate.minusDays(7);
 
             status.put("recentStockData", stockDataRepository
-                    .findBySymbolAndDateBetweenOrderByDateAsc(sampleSymbol, startDate, endDate)
+                    .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(sampleSymbol, startDate, endDate)
                     .size());
 
             status.put("recentIndicators", technicalIndicatorRepository
-                    .findBySymbolAndDateBetweenOrderByDateAsc(sampleSymbol, startDate, endDate)
+                    .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(sampleSymbol, startDate, endDate, model.getUserId)
                     .size());
 
             mlModelRepository.findBySymbol(sampleSymbol)
@@ -197,14 +197,14 @@ public class BackendTestController {
         try {
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusYears(2);
-            List<StockData> data = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate);
+            List<StockData> data = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate, model.getUserId());
             stockDataRepository.saveAll(data);
             result.put("dataCollection", Map.of(
                     "status", "success",
                     "dataPointsCollected", data.size()
             ));
 
-            List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(symbol, startDate, endDate);
+            List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(symbol, startDate, endDate, model.getUserId());
             result.put("indicatorCalculation", Map.of(
                     "status", "success",
                     "indicatorsCalculated", indicators.size()
@@ -217,7 +217,7 @@ public class BackendTestController {
                     "trainingError", model.getTrainingError()
             ));
 
-            List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(symbol);
+            List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(symbol, model.getUserId());
             StockPrediction prediction = predictions.get(0);
             result.put("prediction", Map.of(
                     "status", "success",

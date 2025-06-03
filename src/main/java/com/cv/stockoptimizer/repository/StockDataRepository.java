@@ -9,6 +9,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
+
+
 @Repository
 public interface StockDataRepository extends MongoRepository<StockData, String> {
     List<StockData> findByUserIdAndSymbolOrderByDateDesc(String userId, String symbol);
@@ -16,6 +18,9 @@ public interface StockDataRepository extends MongoRepository<StockData, String> 
 
     @Query(value = "{'userId': ?0}", fields = "{ 'symbol' : 1 }")
     Set<String> findDistinctSymbolsByUserId(String userId);
+
+    @Query(value = "{}", fields = "{ 'symbol' : 1 }")
+    Set<String> findDistinctSymbols();  // For backward compatibility
 
     void deleteByUserIdAndSymbol(String userId, String symbol);
 
@@ -26,6 +31,8 @@ public interface StockDataRepository extends MongoRepository<StockData, String> 
     // Delete by userId and date range
     void deleteByUserIdAndSymbolAndDateBetween(
             String userId, String symbol, LocalDate from, LocalDate to);
+
+    String userId(String userId);
 
     String userId(String userId);
 }

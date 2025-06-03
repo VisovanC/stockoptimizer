@@ -128,7 +128,7 @@ public class MarketDataCollectorService {
         throw new IOException("Failed to fetch data for " + symbol + " after " + MAX_RETRIES + " attempts", lastException);
     }
 
-   /* public Map<String, List<StockData>> fetchHistoricalDataBatch(List<String> symbols, LocalDate from, LocalDate to) throws IOException {
+   public Map<String, List<StockData>> fetchHistoricalDataBatch(List<String> symbols, LocalDate from, LocalDate to) throws IOException {
         Map<String, List<StockData>> result = new HashMap<>();
 
         for (int i = 0; i < symbols.size(); i++) {
@@ -153,7 +153,7 @@ public class MarketDataCollectorService {
         }
 
         return result;
-    }*/
+    }
 
     /**
      * Fallback method to generate sample data for testing when Yahoo Finance is unavailable
@@ -222,7 +222,7 @@ public class MarketDataCollectorService {
         System.out.println("Saved " + stockDataList.size() + " stock data records for user " + userId);
     }
 
-    /*public void collectInitialData(int years) throws IOException {
+    public void collectInitialData(int years) throws IOException {
         List<String> symbols = Arrays.asList(
                 "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"
         );
@@ -278,5 +278,5 @@ public class MarketDataCollectorService {
                 System.err.println("Error updating data for " + symbol + ": " + e.getMessage());
             }
         }
-    }*/
+    }
 }

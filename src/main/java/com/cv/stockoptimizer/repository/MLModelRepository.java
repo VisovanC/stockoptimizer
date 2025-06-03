@@ -6,10 +6,15 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+
 @Repository
 public interface MLModelRepository extends MongoRepository<MLModel, String> {
 
     Optional<MLModel> findByUserIdAndSymbol(String userId, String symbol);
 
+    Optional<MLModel> findBySymbol(String symbol);  // Keep for backward compatibility
+
     List<MLModel> findByModelType(String modelType);
+
+    List<MLModel> findByUserId(String userId);
 }

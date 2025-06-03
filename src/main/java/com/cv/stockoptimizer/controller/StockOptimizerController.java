@@ -100,8 +100,8 @@ public class StockOptimizerController {
         LocalDate end = endDate != null ? LocalDate.parse(endDate) : LocalDate.now();
         LocalDate start = startDate != null ? LocalDate.parse(startDate) : end.minusMonths(3);
 
-        List<StockData> data = stockDataRepository.findBySymbolAndDateBetweenOrderByDateAsc(
-                symbol.toUpperCase(), start, end);
+        List<StockData> data = stockDataRepository.findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(
+                stockDataRepository.userId(userId()),symbol.toUpperCase(), start, end);
 
         return ResponseEntity.ok(data);
     }

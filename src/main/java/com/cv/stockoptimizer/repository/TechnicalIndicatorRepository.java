@@ -15,6 +15,7 @@ public interface TechnicalIndicatorRepository extends MongoRepository<TechnicalI
     List<TechnicalIndicator> findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(String userId, String symbol, LocalDate from, LocalDate to);
     void deleteByUserIdAndSymbol(String userId, String symbol);
 
+
     void deleteByUserIdAndSymbolAndDateBetween(
             String userId, String symbol, LocalDate from, LocalDate to);
 

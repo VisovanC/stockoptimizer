@@ -34,6 +34,11 @@ public class MLController {
 
     // Basic stocks to work with
     private static final List<String> BASIC_STOCKS = Arrays.asList("AAPL", "MSFT", "GOOGL", "AMZN", "TSLA");
+    private String getCurrentUserId() {
+        // For now, return "system" as default
+        // In a real implementation, this would get the user from the security context
+        return "system";
+    }
 
     @Autowired
     public MLController(
@@ -63,7 +68,7 @@ public class MLController {
         try {
             // Get database counts
             long stockDataCount = stockDataRepository.count();
-            Set<String> symbols = stockDataRepository.findDistinctSymbols();
+            Set<String> symbols = stockDataRepository.findDistinctSymbolsByUserId(getCurrentUserId());
             long modelCount = mlModelRepository.count();
             long predictionCount = stockPredictionRepository.count();
 
@@ -114,15 +119,15 @@ public class MLController {
 
                     if (useSampleData) {
                         // Use sample data generator
-                        data = dataCollectorService.generateSampleData(symbol, startDate, endDate);
+                        data = dataCollectorService.generateSampleData(symbol, startDate, endDate, getCurrentUserId());
                     } else {
                         // Try to fetch from Yahoo Finance
-                        data = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate);
+                        data = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate, getCurrentUserId());
 
                         // If Yahoo Finance fails, fall back to sample data
                         if (data.isEmpty()) {
                             System.out.println("Yahoo Finance failed, using sample data for " + symbol);
-                            data = dataCollectorService.generateSampleData(symbol, startDate, endDate);
+                            data = dataCollectorService.generateSampleData(symbol, startDate, endDate, getCurrentUserId());
                         }
                     }
 
@@ -140,7 +145,7 @@ public class MLController {
 
                     // Try sample data as fallback
                     try {
-                        List<StockData> sampleData = dataCollectorService.generateSampleData(symbol, startDate, endDate);
+                        List<StockData> sampleData = dataCollectorService.generateSampleData(symbol, startDate, endDate, getCurrentUserId());
                         stockDataRepository.saveAll(sampleData);
                         successfulStocks.add(symbol + " (sample)");
                         totalDataPoints += sampleData.size();
@@ -156,7 +161,7 @@ public class MLController {
             for (String symbol : successfulStocks) {
                 try {
                     String cleanSymbol = symbol.replace(" (sample)", "");
-                    indicatorService.calculateAllIndicators(cleanSymbol, startDate, endDate);
+                    indicatorService.calculateAllIndicators(cleanSymbol, startDate, endDate, getCurrentUserId());
                     System.out.println("Calculated indicators for " + cleanSymbol);
                 } catch (Exception e) {
                     System.err.println("Error calculating indicators for " + symbol + ": " + e.getMessage());
@@ -182,12 +187,13 @@ public class MLController {
     @PostMapping("/train-models")
     public ResponseEntity<Map<String, Object>> trainModels() {
         Map<String, Object> response = new HashMap<>();
+        String userId = getCurrentUserId();
 
         try {
-            System.out.println("Starting model training...");
+            System.out.println("Starting model training for user: " + userId);
 
             // Get available symbols
-            Set<String> availableSymbols = stockDataRepository.findDistinctSymbols();
+            Set<String> availableSymbols = stockDataRepository.findDistinctSymbolsByUserId(userId);
             List<String> trainedSymbols = new ArrayList<>();
             List<String> failedSymbols = new ArrayList<>();
 
@@ -196,8 +202,8 @@ public class MLController {
                     // Check if we have enough data
                     LocalDate endDate = LocalDate.now();
                     LocalDate startDate = endDate.minusYears(2);
-                    List<StockData> data = stockDataRepository.findBySymbolAndDateBetweenOrderByDateAsc(
-                            symbol, startDate, endDate);
+                    List<StockData> data = stockDataRepository.findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(
+                            userId, symbol, startDate, endDate);
 
                     if (data.size() < 100) {
                         System.out.println("Not enough data for " + symbol + " (" + data.size() + " points)");
@@ -206,7 +212,7 @@ public class MLController {
                     }
 
                     System.out.println("Training model for " + symbol + "...");
-                    MLModel model = neuralNetworkService.trainModelForStock(symbol);
+                    MLModel model = neuralNetworkService.trainModelForStock(symbol, userId);
                     trainedSymbols.add(symbol);
                     System.out.println("Successfully trained model for " + symbol +
                             " with error: " + model.getTrainingError());
@@ -247,7 +253,7 @@ public class MLController {
             for (MLModel model : models) {
                 try {
                     System.out.println("Generating prediction for " + model.getSymbol() + "...");
-                    List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(model.getSymbol());
+                    List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(model.getUserId(), model.getSymbol());
 
                     if (!predictions.isEmpty()) {
                         predictedSymbols.add(model.getSymbol());

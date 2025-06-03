@@ -231,19 +231,19 @@ public class NeuralNetworkService {
      * Train model for a specific stock
      */
     public MLModel trainModelForStock(String symbol, String userId) throws IOException {
-        System.out.println("Starting model training for " + symbol);
+        System.out.println("Starting model training for " + symbol + " for user " + userId);
 
-        // Check if model already exists
+        // Check if model already exists for this user
         Optional<MLModel> existingModel = mlModelRepository.findByUserIdAndSymbol(userId, symbol);
         if (existingModel.isPresent()) {
-            System.out.println("Found existing model for " + symbol + ", retraining...");
+            System.out.println("Found existing model for " + symbol + " for user " + userId + ", retraining...");
         }
 
         // Prepare dates for training data
         LocalDate today = LocalDate.now();
-        LocalDate trainStart = today.minusYears(2); // Reduced from 5 years for faster training
+        LocalDate trainStart = today.minusYears(2);
 
-        // Prepare data
+        // Prepare data with userId
         MLDataSet trainingData;
         try {
             trainingData = prepareTrainingData(symbol, trainStart, today, userId);
@@ -293,18 +293,17 @@ public class NeuralNetworkService {
         MLModel savedModel = mlModelRepository.save(model);
         System.out.println("Model metadata saved for " + symbol);
 
-        return savedModel;
-
-
-
+        return mlModelRepository.save(model);
     }
 
     /**
      * Load a trained model for a given stock
      */
-    public BasicNetwork loadModel(String symbol, String userId) throws IOException {
-        MLModel modelInfo = mlModelRepository.findByUserIdAndSymbol(userId, symbol)
-                .orElseThrow(() -> new IllegalArgumentException("No trained model exists for " + symbol));
+    public BasicNetwork loadModel(String symbol) throws IOException {
+        // First try to find with system userId
+        MLModel modelInfo = mlModelRepository.findByUserIdAndSymbol("system", symbol)
+                .orElseGet(() -> mlModelRepository.findBySymbol(symbol)
+                        .orElseThrow(() -> new IllegalArgumentException("No trained model exists for " + symbol)));
 
         File modelFile = new File(modelInfo.getModelFilePath());
         if (!modelFile.exists()) {
@@ -322,17 +321,18 @@ public class NeuralNetworkService {
      * Make predictions for the future price movements
      */
     public List<StockPrediction> predictFuturePrices(String symbol, String userId) throws IOException {
-        System.out.println("Generating predictions for " + symbol);
+        System.out.println("Generating predictions for " + symbol + " for user " + userId);
 
-        // Load the model
-        BasicNetwork network = loadModel(symbol, userId);
+        // Load the model for this user
+        BasicNetwork network = loadModel(symbol);
 
-        // Get the most recent data for prediction
+        // Get recent data for this user
         LocalDate today = LocalDate.now();
-        LocalDate startDate = today.minusDays(INPUT_WINDOW * 2); // Double buffer
+        LocalDate startDate = today.minusDays(INPUT_WINDOW * 2);
 
         List<TechnicalIndicator> recentData = technicalIndicatorRepository
                 .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, symbol, startDate, today);
+
 
         System.out.println("Found " + recentData.size() + " recent data points for " + symbol);
 
@@ -421,6 +421,7 @@ public class NeuralNetworkService {
 
         // Create prediction record
         StockPrediction prediction = new StockPrediction();
+        prediction.setUserId(userId); // Set userId
         prediction.setSymbol(symbol);
         prediction.setPredictionDate(today);
         prediction.setTargetDate(today.plusDays(PREDICTION_DAYS));
@@ -434,7 +435,7 @@ public class NeuralNetworkService {
         System.out.println("Prediction saved for " + symbol + ": " +
                 String.format("%.2f%%", predictedChangePercentage * 100));
 
-        return Collections.singletonList(savedPrediction);
+        return predictFuturePrices(symbol, "system");
     }
 
     /**
@@ -443,6 +444,11 @@ public class NeuralNetworkService {
     private double calculateConfidenceScore(double normalizedPrediction) {
         // Simple confidence calculation based on the distance from zero
         return Math.min(100, Math.abs(normalizedPrediction) * 100);
+    }
+
+    public MLModel trainModelForStock(String symbol) throws IOException {
+        // Use a default userId or system userId for backward compatibility
+        return trainModelForStock(symbol, "system");
     }
 
     /**
