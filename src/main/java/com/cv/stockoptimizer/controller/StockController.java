@@ -11,6 +11,8 @@ import com.cv.stockoptimizer.service.data.TechnicalIndicatorService;
 import com.cv.stockoptimizer.service.ml.NeuralNetworkService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -19,6 +21,10 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/stocks")
 public class StockController {
+    private String getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication.getName();
+    }
 
     private final StockDataRepository stockDataRepository;
     private final TechnicalIndicatorRepository technicalIndicatorRepository;
@@ -45,7 +51,7 @@ public class StockController {
 
     @GetMapping("/symbols")
     public ResponseEntity<Set<String>> getAllSymbols() {
-        Set<String> symbols = stockDataRepository.findDistinctSymbols();
+        Set<String> symbols = stockDataRepository.findDistinctSymbolsByUserId(getCurrentUserId());
         return ResponseEntity.ok(symbols);
     }
 
@@ -55,11 +61,13 @@ public class StockController {
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
 
+        String userId = getCurrentUserId();
         LocalDate fromDate = from != null ? LocalDate.parse(from) : LocalDate.now().minusMonths(3);
         LocalDate toDate = to != null ? LocalDate.parse(to) : LocalDate.now();
 
-        List<StockData> data = stockDataRepository.findBySymbolAndDateBetweenOrderByDateAsc(
-                symbol.toUpperCase(), fromDate, toDate);
+        // Use userId in the query
+        List<StockData> data = stockDataRepository.findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(
+                userId, symbol.toUpperCase(), fromDate, toDate);
 
         return ResponseEntity.ok(data);
     }
@@ -70,11 +78,13 @@ public class StockController {
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
 
+        String currentUserId = getCurrentUserId();
+
         LocalDate fromDate = from != null ? LocalDate.parse(from) : LocalDate.now().minusMonths(3);
         LocalDate toDate = to != null ? LocalDate.parse(to) : LocalDate.now();
 
         List<TechnicalIndicator> indicators = technicalIndicatorRepository
-                .findBySymbolAndDateBetweenOrderByDateAsc(symbol.toUpperCase(), fromDate, toDate);
+                .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(currentUserId, symbol.toUpperCase(), fromDate, toDate);
 
         return ResponseEntity.ok(indicators);
     }
@@ -92,18 +102,23 @@ public class StockController {
             @PathVariable String symbol,
             @RequestParam(defaultValue = "365") int days) {
 
+        String userId = getCurrentUserId();
+
         try {
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusDays(days);
 
-            List<StockData> data = dataCollectorService.fetchHistoricalData(symbol.toUpperCase(), startDate, endDate);
-            stockDataRepository.saveAll(data);
+            // Pass userId to the service
+            List<StockData> data = dataCollectorService.fetchHistoricalData(
+                    symbol.toUpperCase(), startDate, endDate, userId);
+
+            // Save data with userId
+            dataCollectorService.saveStockDataForUser(data, userId, symbol.toUpperCase());
 
             Map<String, Object> response = new HashMap<>();
             response.put("symbol", symbol);
             response.put("dataPoints", data.size());
-            response.put("startDate", startDate);
-            response.put("endDate", endDate);
+            response.put("userId", userId);
             response.put("status", "success");
 
             return ResponseEntity.ok(response);
@@ -117,16 +132,20 @@ public class StockController {
 
     @PostMapping("/indicators/calculate/{symbol}")
     public ResponseEntity<?> calculateIndicators(@PathVariable String symbol) {
+        String userId = getCurrentUserId();
+
         try {
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusYears(2);
 
+            // Pass userId to the service
             List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(
-                    symbol.toUpperCase(), startDate, endDate);
+                    symbol.toUpperCase(), startDate, endDate, userId);
 
             Map<String, Object> response = new HashMap<>();
             response.put("symbol", symbol);
             response.put("indicatorsCalculated", indicators.size());
+            response.put("userId", userId);
             response.put("status", "success");
 
             return ResponseEntity.ok(response);
@@ -137,6 +156,7 @@ public class StockController {
             return ResponseEntity.internalServerError().body(response);
         }
     }
+
 
     @PostMapping("/predictions/generate/{symbol}")
     public ResponseEntity<?> generatePrediction(@PathVariable String symbol) {
@@ -169,16 +189,16 @@ public class StockController {
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusYears(2);
 
-            List<StockData> data = stockDataRepository.findBySymbolAndDateBetweenOrderByDateAsc(
-                    symbol.toUpperCase(), startDate, endDate);
+            List<StockData> data = stockDataRepository.findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(
+                    getCurrentUserId(), symbol.toUpperCase(), startDate, endDate);
 
             if (data.size() < 100) {
-                data = dataCollectorService.fetchHistoricalData(symbol.toUpperCase(), startDate, endDate);
+                data = dataCollectorService.fetchHistoricalData(symbol.toUpperCase(), startDate, endDate, getCurrentUserId());
                 stockDataRepository.saveAll(data);
             }
 
             List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(
-                    symbol.toUpperCase(), startDate, endDate);
+                    symbol.toUpperCase(), startDate, endDate, getCurrentUserId());
             List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(symbol.toUpperCase());
             StockPrediction prediction = predictions.get(0);
             Map<String, Object> analysis = new HashMap<>();
@@ -328,7 +348,7 @@ public class StockController {
 
     @GetMapping("/search")
     public ResponseEntity<?> searchStocks(@RequestParam String query) {
-        Set<String> allSymbols = stockDataRepository.findDistinctSymbols();
+        Set<String> allSymbols = stockDataRepository.findDistinctSymbolsByUserId(getCurrentUserId());
 
         List<Map<String, String>> results = new ArrayList<>();
 

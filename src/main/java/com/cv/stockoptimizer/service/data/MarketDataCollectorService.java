@@ -28,22 +28,27 @@ public class MarketDataCollectorService {
         this.stockDataRepository = stockDataRepository;
     }
 
-    public List<StockData> fetchHistoricalData(String symbol, LocalDate from, LocalDate to) throws IOException {
+    public List<StockData> fetchHistoricalData(String symbol, LocalDate from, LocalDate to, String userId) throws IOException {
+        // First check if user already has this data
+        boolean dataExists = stockDataRepository.existsByUserIdAndSymbolAndDateBetween(userId, symbol, from, to);
+        if (dataExists) {
+            System.out.println("Data already exists for user " + userId + " and symbol " + symbol);
+            return stockDataRepository.findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, symbol, from, to);
+        }
+
         IOException lastException = null;
 
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             try {
-                // Add delay to avoid rate limiting
                 if (attempt > 1) {
                     long delay = Math.min(INITIAL_DELAY_MS * (long) Math.pow(2, attempt - 1), MAX_DELAY_MS);
                     System.out.println("Waiting " + delay + "ms before retry attempt " + attempt + " for " + symbol);
                     Thread.sleep(delay);
                 } else {
-                    // Even on first attempt, add a small delay
                     Thread.sleep(1000);
                 }
 
-                System.out.println("Fetching data for " + symbol + " (attempt " + attempt + "/" + MAX_RETRIES + ")");
+                System.out.println("Fetching data for " + symbol + " for user " + userId + " (attempt " + attempt + "/" + MAX_RETRIES + ")");
 
                 Calendar fromDate = Calendar.getInstance();
                 fromDate.setTime(java.sql.Date.valueOf(from));
@@ -62,9 +67,9 @@ public class MarketDataCollectorService {
                 if (quotes == null || quotes.isEmpty()) {
                     System.out.println("No historical data returned for " + symbol);
 
-                    // Check if we have existing data in the database
+                    // Check if we have existing data in the database for this user
                     List<StockData> existingData = stockDataRepository
-                            .findBySymbolAndDateBetweenOrderByDateAsc(symbol, from, to);
+                            .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, symbol, from, to);
 
                     if (!existingData.isEmpty()) {
                         System.out.println("Using " + existingData.size() + " existing data points from database for " + symbol);
@@ -76,19 +81,23 @@ public class MarketDataCollectorService {
 
                 List<StockData> stockDataList = quotes.stream()
                         .filter(quote -> quote.getClose() != null)
-                        .map(quote -> new StockData(
-                                symbol,
-                                quote.getDate().getTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDate(),
-                                quote.getOpen() != null ? quote.getOpen().doubleValue() : 0,
-                                quote.getHigh() != null ? quote.getHigh().doubleValue() : 0,
-                                quote.getLow() != null ? quote.getLow().doubleValue() : 0,
-                                quote.getClose().doubleValue(),
-                                quote.getVolume() != null ? quote.getVolume().longValue() : 0,
-                                quote.getAdjClose() != null ? quote.getAdjClose().doubleValue() : 0
-                        ))
+                        .map(quote -> {
+                            StockData data = new StockData(
+                                    userId, // Include userId
+                                    symbol,
+                                    quote.getDate().getTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDate(),
+                                    quote.getOpen() != null ? quote.getOpen().doubleValue() : 0,
+                                    quote.getHigh() != null ? quote.getHigh().doubleValue() : 0,
+                                    quote.getLow() != null ? quote.getLow().doubleValue() : 0,
+                                    quote.getClose().doubleValue(),
+                                    quote.getVolume() != null ? quote.getVolume().longValue() : 0
+                            );
+                            data.setAdjClose(quote.getAdjClose() != null ? quote.getAdjClose().doubleValue() : quote.getClose().doubleValue());
+                            return data;
+                        })
                         .collect(Collectors.toList());
 
-                System.out.println("Successfully fetched " + stockDataList.size() + " data points for " + symbol);
+                System.out.println("Successfully fetched " + stockDataList.size() + " data points for " + symbol + " for user " + userId);
                 return stockDataList;
 
             } catch (IOException e) {
@@ -103,7 +112,7 @@ public class MarketDataCollectorService {
                 // Check if we have existing data in the database as fallback
                 if (attempt == MAX_RETRIES) {
                     List<StockData> existingData = stockDataRepository
-                            .findBySymbolAndDateBetweenOrderByDateAsc(symbol, from, to);
+                            .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, symbol, from, to);
 
                     if (!existingData.isEmpty()) {
                         System.out.println("Using " + existingData.size() + " existing data points from database for " + symbol);
@@ -116,11 +125,10 @@ public class MarketDataCollectorService {
             }
         }
 
-        // If all retries failed, throw the last exception
         throw new IOException("Failed to fetch data for " + symbol + " after " + MAX_RETRIES + " attempts", lastException);
     }
 
-    public Map<String, List<StockData>> fetchHistoricalDataBatch(List<String> symbols, LocalDate from, LocalDate to) throws IOException {
+   /* public Map<String, List<StockData>> fetchHistoricalDataBatch(List<String> symbols, LocalDate from, LocalDate to) throws IOException {
         Map<String, List<StockData>> result = new HashMap<>();
 
         for (int i = 0; i < symbols.size(); i++) {
@@ -145,18 +153,17 @@ public class MarketDataCollectorService {
         }
 
         return result;
-    }
+    }*/
 
     /**
      * Fallback method to generate sample data for testing when Yahoo Finance is unavailable
      */
-    public List<StockData> generateSampleData(String symbol, LocalDate from, LocalDate to) {
-        System.out.println("Generating sample data for " + symbol + " (Yahoo Finance unavailable)");
+    public List<StockData> generateSampleData(String symbol, LocalDate from, LocalDate to, String userId) {
+        System.out.println("Generating sample data for " + symbol + " for user " + userId);
 
         List<StockData> sampleData = new ArrayList<>();
         LocalDate currentDate = from;
 
-        // Starting prices for different symbols
         Map<String, Double> basePrices = new HashMap<>();
         basePrices.put("AAPL", 150.0);
         basePrices.put("MSFT", 300.0);
@@ -165,17 +172,15 @@ public class MarketDataCollectorService {
         basePrices.put("TSLA", 800.0);
 
         double basePrice = basePrices.getOrDefault(symbol, 100.0);
-        Random random = new Random(symbol.hashCode()); // Consistent random data for same symbol
+        Random random = new Random(symbol.hashCode() + userId.hashCode()); // Include userId in seed
 
         while (!currentDate.isAfter(to)) {
-            // Skip weekends
             if (currentDate.getDayOfWeek().getValue() >= 6) {
                 currentDate = currentDate.plusDays(1);
                 continue;
             }
 
-            // Generate realistic price movement
-            double dailyChange = (random.nextDouble() - 0.5) * 0.02; // +/- 2% daily change
+            double dailyChange = (random.nextDouble() - 0.5) * 0.02;
             basePrice = basePrice * (1 + dailyChange);
 
             double open = basePrice * (1 + (random.nextDouble() - 0.5) * 0.01);
@@ -184,17 +189,40 @@ public class MarketDataCollectorService {
             double close = basePrice;
             long volume = 1000000 + random.nextInt(5000000);
 
-            StockData data = new StockData(symbol, currentDate, open, high, low, close, volume, close);
+            StockData data = new StockData(userId, symbol, currentDate, open, high, low, close, volume);
+            data.setAdjClose(close);
             sampleData.add(data);
 
             currentDate = currentDate.plusDays(1);
         }
 
-        System.out.println("Generated " + sampleData.size() + " sample data points for " + symbol);
+        System.out.println("Generated " + sampleData.size() + " sample data points for " + symbol + " for user " + userId);
         return sampleData;
     }
 
-    public void collectInitialData(int years) throws IOException {
+    public void saveStockDataForUser(List<StockData> stockDataList, String userId, String symbol) {
+        if (stockDataList.isEmpty()) return;
+
+        // Get date range from the data
+        LocalDate minDate = stockDataList.stream()
+                .map(StockData::getDate)
+                .min(LocalDate::compareTo)
+                .orElse(LocalDate.now());
+
+        LocalDate maxDate = stockDataList.stream()
+                .map(StockData::getDate)
+                .max(LocalDate::compareTo)
+                .orElse(LocalDate.now());
+
+        // Delete existing data in this range for this user
+        stockDataRepository.deleteByUserIdAndSymbolAndDateBetween(userId, symbol, minDate, maxDate);
+
+        // Save new data
+        stockDataRepository.saveAll(stockDataList);
+        System.out.println("Saved " + stockDataList.size() + " stock data records for user " + userId);
+    }
+
+    /*public void collectInitialData(int years) throws IOException {
         List<String> symbols = Arrays.asList(
                 "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"
         );
@@ -250,5 +278,5 @@ public class MarketDataCollectorService {
                 System.err.println("Error updating data for " + symbol + ": " + e.getMessage());
             }
         }
-    }
+    }*/
 }

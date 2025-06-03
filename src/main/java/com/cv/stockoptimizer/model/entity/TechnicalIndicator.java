@@ -14,6 +14,7 @@ public class TechnicalIndicator {
     @Id
     private String id;
 
+    private String userId;
     private String symbol;
     private LocalDate date;
     private double price;
@@ -138,4 +139,9 @@ public class TechnicalIndicator {
     public void setBollingerLower(Double bollingerLower) {
         this.bollingerLower = bollingerLower;
     }
+
+    public String getUserId() { return userId; }
+
+    public void setUserId(String userId) { this.userId = userId; }
+
 }

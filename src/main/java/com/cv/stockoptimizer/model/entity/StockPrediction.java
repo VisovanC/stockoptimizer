@@ -9,6 +9,7 @@ public class StockPrediction {
     @Id
     private String id;
 
+    private String userId;
     private String symbol;
     private LocalDate predictionDate;
     private LocalDate targetDate;
@@ -106,4 +107,8 @@ public class StockPrediction {
     public void setVerified(boolean verified) {
         this.verified = verified;
     }
+
+    public String getUserId() { return userId; }
+
+    public void setUserId(String userId) { this.userId = userId; }
 }

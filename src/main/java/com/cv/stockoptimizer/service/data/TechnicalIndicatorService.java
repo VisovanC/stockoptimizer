@@ -23,6 +23,7 @@ public class TechnicalIndicatorService {
         this.technicalIndicatorRepository = technicalIndicatorRepository;
     }
 
+
     //Calculate moving average for a given period
 
     private List<Double> calculateMovingAverage(List<Double> data, int period) {
@@ -186,13 +187,17 @@ public class TechnicalIndicatorService {
 
     // Calculate all technical indicators for a given stock
 
-    public List<TechnicalIndicator> calculateAllIndicators(String symbol, LocalDate from, LocalDate to) {
-        // Fetch stock data for the given period
-        List<StockData> stockDataList = stockDataRepository.findBySymbolAndDateBetweenOrderByDateAsc(symbol, from, to);
+    public List<TechnicalIndicator> calculateAllIndicators(String symbol, LocalDate from, LocalDate to, String userId) {
+        // Fetch stock data for the given user and period
+        List<StockData> stockDataList = stockDataRepository
+                .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, symbol, from, to);
 
         if (stockDataList.isEmpty()) {
             return Collections.emptyList();
         }
+
+        // Delete existing indicators for this user, symbol and date range to avoid duplicates
+        technicalIndicatorRepository.deleteByUserIdAndSymbolAndDateBetween(userId, symbol, from, to);
 
         // Extract closing prices
         List<Double> closingPrices = stockDataList.stream()
@@ -207,57 +212,75 @@ public class TechnicalIndicatorService {
         Map<String, List<Double>> macd = calculateMACD(closingPrices);
         Map<String, List<Double>> bollingerBands = calculateBollingerBands(closingPrices, 20, 2.0);
 
-        // Create technical indicator objects
+        // Create technical indicator objects with userId
         List<TechnicalIndicator> indicators = new ArrayList<>();
 
         for (int i = 0; i < stockDataList.size(); i++) {
             StockData stockData = stockDataList.get(i);
 
             TechnicalIndicator indicator = new TechnicalIndicator();
+            indicator.setUserId(userId); // Set userId
             indicator.setSymbol(symbol);
             indicator.setDate(stockData.getDate());
             indicator.setPrice(stockData.getClose());
 
             // Set moving averages
-            indicator.setSma20(i < sma20.size() ? sma20.get(i) : null);
-            indicator.setSma50(i < sma50.size() ? sma50.get(i) : null);
-            indicator.setSma200(i < sma200.size() ? sma200.get(i) : null);
+            indicator.setSma20(i < sma20.size() && !Double.isNaN(sma20.get(i)) ? sma20.get(i) : null);
+            indicator.setSma50(i < sma50.size() && !Double.isNaN(sma50.get(i)) ? sma50.get(i) : null);
+            indicator.setSma200(i < sma200.size() && !Double.isNaN(sma200.get(i)) ? sma200.get(i) : null);
 
             // Set RSI
-            indicator.setRsi14(i < rsi14.size() ? rsi14.get(i) : null);
+            indicator.setRsi14(i < rsi14.size() && !Double.isNaN(rsi14.get(i)) ? rsi14.get(i) : null);
 
             // Set MACD
-            indicator.setMacdLine(i < macd.get("macdLine").size() ? macd.get("macdLine").get(i) : null);
-            indicator.setMacdSignal(i < macd.get("signalLine").size() ? macd.get("signalLine").get(i) : null);
-            indicator.setMacdHistogram(i < macd.get("histogram").size() ? macd.get("histogram").get(i) : null);
+            List<Double> macdLine = macd.get("macdLine");
+            List<Double> signalLine = macd.get("signalLine");
+            List<Double> histogram = macd.get("histogram");
+
+            indicator.setMacdLine(i < macdLine.size() && !Double.isNaN(macdLine.get(i)) ? macdLine.get(i) : null);
+            indicator.setMacdSignal(i < signalLine.size() && !Double.isNaN(signalLine.get(i)) ? signalLine.get(i) : null);
+            indicator.setMacdHistogram(i < histogram.size() && !Double.isNaN(histogram.get(i)) ? histogram.get(i) : null);
 
             // Set Bollinger Bands
-            indicator.setBollingerUpper(i < bollingerBands.get("upperBand").size() ? bollingerBands.get("upperBand").get(i) : null);
-            indicator.setBollingerMiddle(i < bollingerBands.get("middleBand").size() ? bollingerBands.get("middleBand").get(i) : null);
-            indicator.setBollingerLower(i < bollingerBands.get("lowerBand").size() ? bollingerBands.get("lowerBand").get(i) : null);
+            List<Double> upperBand = bollingerBands.get("upperBand");
+            List<Double> middleBand = bollingerBands.get("middleBand");
+            List<Double> lowerBand = bollingerBands.get("lowerBand");
+
+            indicator.setBollingerUpper(i < upperBand.size() && !Double.isNaN(upperBand.get(i)) ? upperBand.get(i) : null);
+            indicator.setBollingerMiddle(i < middleBand.size() && !Double.isNaN(middleBand.get(i)) ? middleBand.get(i) : null);
+            indicator.setBollingerLower(i < lowerBand.size() && !Double.isNaN(lowerBand.get(i)) ? lowerBand.get(i) : null);
 
             indicators.add(indicator);
         }
 
-        // Save and return the indicators
-        return technicalIndicatorRepository.saveAll(indicators);
+        // Save all indicators at once
+        List<TechnicalIndicator> savedIndicators = technicalIndicatorRepository.saveAll(indicators);
+        System.out.println("Saved " + savedIndicators.size() + " technical indicators for user " + userId + " and symbol " + symbol);
+
+        return savedIndicators;
     }
 
     // Calculate and store technical indicators for all stocks in the database
 
-    public void calculateAndStoreAllIndicators() {
-        // Get all unique symbols from the repository
-        Set<String> symbols = stockDataRepository.findDistinctSymbols();
+    public void saveIndicatorsForUser(List<TechnicalIndicator> indicators, String userId, String symbol) {
+        if (indicators.isEmpty()) return;
 
-        LocalDate today = LocalDate.now();
-        LocalDate startDate = today.minusYears(2); // 2 years of data
+        // Get date range
+        LocalDate minDate = indicators.stream()
+                .map(TechnicalIndicator::getDate)
+                .min(LocalDate::compareTo)
+                .orElse(LocalDate.now());
 
-        for (String symbol : symbols) {
-            try {
-                calculateAllIndicators(symbol, startDate, today);
-            } catch (Exception e) {
-                System.err.println("Error calculating indicators for " + symbol + ": " + e.getMessage());
-            }
-        }
+        LocalDate maxDate = indicators.stream()
+                .map(TechnicalIndicator::getDate)
+                .max(LocalDate::compareTo)
+                .orElse(LocalDate.now());
+
+        // Delete existing indicators in this range
+        technicalIndicatorRepository.deleteByUserIdAndSymbolAndDateBetween(userId, symbol, minDate, maxDate);
+
+        // Save new indicators
+        technicalIndicatorRepository.saveAll(indicators);
+        System.out.println("Saved " + indicators.size() + " indicators for user " + userId);
     }
 }

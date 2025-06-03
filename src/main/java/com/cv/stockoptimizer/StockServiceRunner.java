@@ -12,6 +12,8 @@ import com.cv.stockoptimizer.service.data.TechnicalIndicatorService;
 import com.cv.stockoptimizer.service.ml.NeuralNetworkService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -53,16 +55,16 @@ public class StockServiceRunner implements CommandLineRunner {
         // Uncomment the methods you want to run
 
         // Step 1: Collect historical data for basic stocks
-        collectDataForBasicStocks();
+        //collectDataForBasicStocks();
 
         // Step 2: Calculate technical indicators for those stocks
-        calculateIndicatorsForBasicStocks();
+       // calculateIndicatorsForBasicStocks();
 
         // Step 3: Train neural network models for the stocks
-        trainModelsForBasicStocks();
+       // trainModelsForBasicStocks();
 
         // Step 4: Make predictions using the trained models
-        makePredictionsForBasicStocks();
+      //  makePredictionsForBasicStocks();
 
         // Or run the complete end-to-end process for a single stock
         // processStockEndToEnd("AAPL");
@@ -76,6 +78,11 @@ public class StockServiceRunner implements CommandLineRunner {
         System.out.println("StockServiceRunner completed");
     }
 
+    private String getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication.getName();
+    }
+
     /**
      * Collect historical data for a predefined list of basic stocks
      */
@@ -84,7 +91,7 @@ public class StockServiceRunner implements CommandLineRunner {
 
         // List of stocks to collect data for
         List<String> basicStocks = Arrays.asList("AAPL", "MSFT", "GOOGL", "AMZN", "TSLA");
-
+        String userId = getCurrentUserId();
         // Date range for historical data (2 years)
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusYears(2);
@@ -95,7 +102,7 @@ public class StockServiceRunner implements CommandLineRunner {
 
                 // Fetch data from Yahoo Finance
                 List<StockData> data = dataCollectorService.fetchHistoricalData(
-                        symbol, startDate, endDate);
+                        symbol, startDate, endDate, userId);
 
                 // Save to MongoDB
                 stockDataRepository.saveAll(data);

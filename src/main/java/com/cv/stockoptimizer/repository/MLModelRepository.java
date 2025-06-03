@@ -9,7 +9,7 @@ import java.util.Optional;
 @Repository
 public interface MLModelRepository extends MongoRepository<MLModel, String> {
 
-    Optional<MLModel> findBySymbol(String symbol);
+    Optional<MLModel> findByUserIdAndSymbol(String userId, String symbol);
 
     List<MLModel> findByModelType(String modelType);
 }

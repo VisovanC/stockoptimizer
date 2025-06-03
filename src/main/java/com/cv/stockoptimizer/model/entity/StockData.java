@@ -15,6 +15,7 @@ public class StockData {
     @Id
     private String id;
 
+    private String userId;
     private String symbol;
     private LocalDate date;
     private double open;
@@ -27,7 +28,8 @@ public class StockData {
     public StockData() {
     }
 
-    public StockData(String symbol, LocalDate date, double open, double high, double low, double close, long volume) {
+    public StockData(String userId, String symbol, LocalDate date, double open, double high, double low, double close, long volume) {
+        this.userId = userId;
         this.symbol = symbol;
         this.date = date;
         this.open = open;
@@ -38,8 +40,8 @@ public class StockData {
         this.adjClose = close;
     }
 
-    public StockData(String symbol, LocalDate date, double open, double high, double low, double close, long volume, double adjClose) {
-        this(symbol, date, open, high, low, close, volume);
+    public StockData(String userId, String symbol, LocalDate date, double open, double high, double low, double close, long volume, double adjClose) {
+        this(userId, symbol, date, open, high, low, close, volume);
         this.adjClose = adjClose;
     }
 
@@ -114,7 +116,12 @@ public class StockData {
     public void setAdjClose(double adjClose) {
         this.adjClose = adjClose;
     }
+
+    public String getUserId() { return userId; }
+
+    public void setUserId(String userId) { this.userId = userId; }
 }
+
 
 
 

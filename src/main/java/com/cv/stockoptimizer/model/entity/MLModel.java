@@ -11,6 +11,7 @@ public class MLModel {
     @Id
     private String id;
 
+    private String userId;
     private String symbol;
     private String modelType;
     private int inputWindow;
@@ -91,4 +92,8 @@ public class MLModel {
     public void setFeatures(List<String> features) {
         this.features = features;
     }
+
+    public String getUserId() { return userId; }
+
+    public void setUserId(String userId) { this.userId = userId; }
 }
