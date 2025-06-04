@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Card, Table, Button, Row, Col, Badge, Alert, ProgressBar, Modal, Form } from 'react-bootstrap';
+import { Container, Card, Table, Button, Row, Col, Badge, Alert, ProgressBar, Modal, Form, Spinner } from 'react-bootstrap';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import portfolioService from '../../services/portfolio.service';
@@ -17,9 +17,26 @@ const PortfolioDetail = () => {
     const [riskTolerance, setRiskTolerance] = useState(0.5);
     const [expandUniverse, setExpandUniverse] = useState(false);
 
+    // ML Training states
+    const [mlStatus, setMlStatus] = useState(null);
+    const [training, setTraining] = useState(false);
+    const [trainingProgress, setTrainingProgress] = useState(null);
+
     useEffect(() => {
         fetchPortfolioData();
+        fetchMLStatus();
     }, [id]);
+
+    useEffect(() => {
+        // Poll for training progress if training is in progress
+        let interval;
+        if (training && trainingProgress && trainingProgress.status === 'in_progress') {
+            interval = setInterval(() => {
+                fetchMLStatus();
+            }, 2000); // Check every 2 seconds
+        }
+        return () => clearInterval(interval);
+    }, [training, trainingProgress]);
 
     const fetchPortfolioData = async () => {
         try {
@@ -37,6 +54,51 @@ const PortfolioDetail = () => {
         }
     };
 
+    const fetchMLStatus = async () => {
+        try {
+            const status = await portfolioService.getMLStatus(id);
+            setMlStatus(status);
+
+            if (status.trainingInProgress) {
+                setTraining(true);
+                setTrainingProgress(status.progress);
+            } else {
+                setTraining(false);
+                if (trainingProgress && trainingProgress.status === 'completed') {
+                    toast.success('ML training completed successfully!');
+                    setTrainingProgress(null);
+                }
+            }
+        } catch (err) {
+            console.error('Failed to fetch ML status:', err);
+        }
+    };
+
+    const handleTrainModels = async () => {
+        try {
+            setTraining(true);
+            const useSampleData = window.confirm(
+                'Would you like to use sample data for training?\n\n' +
+                'Click OK for sample data (faster, for testing)\n' +
+                'Click Cancel for real market data (slower, more accurate)'
+            );
+
+            const response = await portfolioService.trainMLModels(id, useSampleData);
+
+            if (response.status === 'training_started') {
+                toast.info(`ML training started for ${response.totalStocks} stocks`);
+                // Start polling for progress
+                fetchMLStatus();
+            } else {
+                toast.error('Failed to start ML training');
+                setTraining(false);
+            }
+        } catch (err) {
+            toast.error('Failed to start ML training: ' + err.message);
+            setTraining(false);
+        }
+    };
+
     const handleOptimize = async () => {
         try {
             setOptimizing(true);
@@ -51,12 +113,20 @@ const PortfolioDetail = () => {
     };
 
     const handleGetAIRecommendations = async () => {
+        // Check if models are trained
+        if (!mlStatus || mlStatus.modelsReady < mlStatus.totalStocks) {
+            toast.error('Please train ML models first before getting AI recommendations');
+            return;
+        }
+
         try {
-            const recommendations = await portfolioService.getAIRecommendations(id, riskTolerance, expandUniverse);
+            const recommendations = await portfolioService.getPersonalizedRecommendations(
+                id, riskTolerance, expandUniverse
+            );
             setAiRecommendations(recommendations);
             setShowAIModal(true);
         } catch (err) {
-            toast.error('Failed to get AI recommendations');
+            toast.error('Failed to get AI recommendations: ' + err.message);
         }
     };
 
@@ -96,6 +166,21 @@ const PortfolioDetail = () => {
                 </Col>
                 <Col xs="auto">
                     <Button
+                        variant="warning"
+                        onClick={handleTrainModels}
+                        disabled={training}
+                        className="me-2"
+                    >
+                        {training ? (
+                            <>
+                                <Spinner animation="border" size="sm" className="me-2" />
+                                Training ML Models...
+                            </>
+                        ) : (
+                            '🤖 Train ML Models'
+                        )}
+                    </Button>
+                    <Button
                         variant="primary"
                         onClick={handleOptimize}
                         disabled={optimizing}
@@ -106,11 +191,86 @@ const PortfolioDetail = () => {
                     <Button
                         variant="success"
                         onClick={handleGetAIRecommendations}
+                        disabled={!mlStatus || mlStatus.modelsReady < mlStatus.totalStocks}
                     >
                         Get AI Recommendations
                     </Button>
                 </Col>
             </Row>
+
+            {/* ML Training Progress */}
+            {trainingProgress && trainingProgress.status === 'in_progress' && (
+                <Alert variant="info" className="mb-4">
+                    <h6>ML Training Progress</h6>
+                    <ProgressBar
+                        now={trainingProgress.percentComplete}
+                        label={`${Math.round(trainingProgress.percentComplete)}%`}
+                        animated
+                        striped
+                    />
+                    <small className="d-block mt-2">
+                        {trainingProgress.currentStep} ({trainingProgress.completedStocks}/{trainingProgress.totalStocks} stocks)
+                    </small>
+                    {trainingProgress.trainedSymbols && trainingProgress.trainedSymbols.length > 0 && (
+                        <small className="d-block mt-1">
+                            Completed: {trainingProgress.trainedSymbols.join(', ')}
+                        </small>
+                    )}
+                </Alert>
+            )}
+
+            {/* ML Status Card */}
+            <Card className="mb-4">
+                <Card.Header>
+                    <div className="d-flex justify-content-between align-items-center">
+                        <span>ML Model Status</span>
+                        <Button
+                            variant="link"
+                            size="sm"
+                            onClick={fetchMLStatus}
+                            disabled={training}
+                        >
+                            🔄 Refresh
+                        </Button>
+                    </div>
+                </Card.Header>
+                <Card.Body>
+                    {mlStatus ? (
+                        <Row>
+                            <Col md={6}>
+                                <p><strong>Models Trained:</strong> {mlStatus.modelsReady}/{mlStatus.totalStocks}</p>
+                                <ProgressBar
+                                    now={(mlStatus.modelsReady / mlStatus.totalStocks) * 100}
+                                    variant={mlStatus.modelsReady === mlStatus.totalStocks ? 'success' : 'warning'}
+                                />
+                                {mlStatus.modelsReady === mlStatus.totalStocks && (
+                                    <Alert variant="success" className="mt-2">
+                                        ✅ All models trained! AI recommendations are available.
+                                    </Alert>
+                                )}
+                            </Col>
+                            <Col md={6}>
+                                <p><strong>Stock Models:</strong></p>
+                                {Object.entries(mlStatus.models).map(([symbol, modelInfo]) => (
+                                    <Badge
+                                        key={symbol}
+                                        bg={modelInfo.exists ? 'success' : 'secondary'}
+                                        className="me-1"
+                                        title={modelInfo.exists ?
+                                            `Trained on ${modelInfo.trainingDate}` :
+                                            'Not trained yet'
+                                        }
+                                    >
+                                        {symbol} {modelInfo.exists ? '✓' : '✗'}
+                                    </Badge>
+                                ))}
+                            </Col>
+                        </Row>
+                    ) : (
+                        <p className="text-muted">Loading ML status...</p>
+                    )}
+                </Card.Body>
+            </Card>
 
             <Row className="mb-4">
                 <Col md={3}>
@@ -148,7 +308,11 @@ const PortfolioDetail = () => {
                         <Card.Body>
                             <h6 className="text-muted">Status</h6>
                             <h4>
-                                <Badge bg={portfolio.optimizationStatus === 'OPTIMIZED' ? 'success' : 'warning'}>
+                                <Badge bg={
+                                    portfolio.optimizationStatus === 'OPTIMIZED' ? 'success' :
+                                        portfolio.optimizationStatus === 'UPGRADED_WITH_AI' ? 'primary' :
+                                            'warning'
+                                }>
                                     {portfolio.optimizationStatus}
                                 </Badge>
                             </h4>
@@ -267,17 +431,45 @@ const PortfolioDetail = () => {
             {/* AI Recommendations Modal */}
             <Modal show={showAIModal} onHide={() => setShowAIModal(false)} size="lg">
                 <Modal.Header closeButton>
-                    <Modal.Title>AI Portfolio Recommendations</Modal.Title>
+                    <Modal.Title>🤖 AI Portfolio Recommendations</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
+                    {/* Risk Tolerance Slider */}
+                    <Form.Group className="mb-4">
+                        <Form.Label>
+                            Risk Tolerance: <strong>{riskTolerance < 0.33 ? 'Conservative' : riskTolerance < 0.67 ? 'Moderate' : 'Aggressive'}</strong>
+                        </Form.Label>
+                        <Form.Range
+                            value={riskTolerance}
+                            onChange={(e) => setRiskTolerance(parseFloat(e.target.value))}
+                            min="0"
+                            max="1"
+                            step="0.1"
+                        />
+                        <div className="d-flex justify-content-between text-muted small">
+                            <span>Conservative</span>
+                            <span>Moderate</span>
+                            <span>Aggressive</span>
+                        </div>
+                    </Form.Group>
+
+                    <Form.Group className="mb-4">
+                        <Form.Check
+                            type="checkbox"
+                            label="Expand universe (consider new stocks)"
+                            checked={expandUniverse}
+                            onChange={(e) => setExpandUniverse(e.target.checked)}
+                        />
+                    </Form.Group>
+
                     {aiRecommendations && (
                         <>
                             <Alert variant="info">
-                                <strong>AI Confidence Score:</strong> {aiRecommendations.aiConfidenceScore}%
+                                <strong>AI Confidence Score:</strong> {aiRecommendations.aiConfidenceScore?.toFixed(1)}%
                             </Alert>
 
                             <h5>Recommended Allocations</h5>
-                            <Table striped bordered>
+                            <Table striped bordered size="sm">
                                 <thead>
                                 <tr>
                                     <th>Symbol</th>
@@ -305,11 +497,11 @@ const PortfolioDetail = () => {
                                 </tbody>
                             </Table>
 
-                            <h5>Expected Performance</h5>
+                            <h5 className="mt-4">Expected Performance</h5>
                             <Row>
                                 <Col md={4}>
                                     <Card>
-                                        <Card.Body>
+                                        <Card.Body className="text-center">
                                             <h6>Expected Return</h6>
                                             <h4 className="text-success">
                                                 {aiRecommendations.expectedPerformance?.expectedAnnualReturn?.toFixed(2)}%
@@ -319,7 +511,7 @@ const PortfolioDetail = () => {
                                 </Col>
                                 <Col md={4}>
                                     <Card>
-                                        <Card.Body>
+                                        <Card.Body className="text-center">
                                             <h6>Expected Volatility</h6>
                                             <h4>{aiRecommendations.expectedPerformance?.expectedAnnualVolatility?.toFixed(2)}%</h4>
                                         </Card.Body>
@@ -327,23 +519,77 @@ const PortfolioDetail = () => {
                                 </Col>
                                 <Col md={4}>
                                     <Card>
-                                        <Card.Body>
+                                        <Card.Body className="text-center">
                                             <h6>Sharpe Ratio</h6>
                                             <h4>{aiRecommendations.expectedPerformance?.sharpeRatio?.toFixed(2)}</h4>
                                         </Card.Body>
                                     </Card>
                                 </Col>
                             </Row>
+
+                            {aiRecommendations.recommendedActions && (
+                                <>
+                                    <h5 className="mt-4">Recommended Actions</h5>
+                                    <Table size="sm">
+                                        <thead>
+                                        <tr>
+                                            <th>Action</th>
+                                            <th>Symbol</th>
+                                            <th>Shares</th>
+                                            <th>Reason</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        {aiRecommendations.recommendedActions
+                                            .filter(action => action.action !== 'HOLD')
+                                            .map((action, idx) => (
+                                                <tr key={idx}>
+                                                    <td>
+                                                        <Badge bg={
+                                                            action.action === 'BUY' ? 'success' :
+                                                                action.action === 'SELL' ? 'danger' : 'secondary'
+                                                        }>
+                                                            {action.action}
+                                                        </Badge>
+                                                    </td>
+                                                    <td>{action.symbol}</td>
+                                                    <td>
+                                                        {action.action === 'BUY' ?
+                                                            `Buy ${action.targetShares - action.currentShares}` :
+                                                            `Sell ${action.currentShares - action.targetShares}`
+                                                        }
+                                                    </td>
+                                                    <td>{action.reason}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </Table>
+                                </>
+                            )}
                         </>
+                    )}
+
+                    {!aiRecommendations && (
+                        <div className="text-center py-4">
+                            <Button
+                                variant="primary"
+                                onClick={handleGetAIRecommendations}
+                                disabled={!mlStatus || mlStatus.modelsReady < mlStatus.totalStocks}
+                            >
+                                Generate AI Recommendations
+                            </Button>
+                        </div>
                     )}
                 </Modal.Body>
                 <Modal.Footer>
                     <Button variant="secondary" onClick={() => setShowAIModal(false)}>
-                        Cancel
+                        Close
                     </Button>
-                    <Button variant="primary" onClick={handleApplyAIRecommendations}>
-                        Apply Recommendations
-                    </Button>
+                    {aiRecommendations && (
+                        <Button variant="primary" onClick={handleApplyAIRecommendations}>
+                            Apply Recommendations
+                        </Button>
+                    )}
                 </Modal.Footer>
             </Modal>
         </Container>

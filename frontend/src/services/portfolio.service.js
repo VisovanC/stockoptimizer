@@ -88,7 +88,7 @@ const portfolioService = {
     return response.data;
   },
 
-  // Get AI upgrade recommendations
+  // Get AI upgrade recommendations (OLD - replaced by getPersonalizedRecommendations)
   getAIRecommendations: async (id, riskTolerance = 0.5, expandUniverse = false) => {
     const response = await api.get(`/ai/portfolio/${id}/upgrade-recommendations`, {
       params: { riskTolerance, expandUniverse }
@@ -99,6 +99,92 @@ const portfolioService = {
   // Apply AI recommendations
   applyAIRecommendations: async (id, allocations) => {
     const response = await api.post(`/ai/portfolio/${id}/apply-upgrade`, allocations);
+    return response.data;
+  },
+
+  // ===== NEW ML TRAINING METHODS =====
+
+  /**
+   * Get the ML training status for a portfolio
+   * Shows which stocks have trained models and training progress
+   */
+  getMLStatus: async (portfolioId) => {
+    try {
+      const response = await api.get(`/ml/portfolio/${portfolioId}/status`);
+      return response.data;
+    } catch (error) {
+      // If the endpoint doesn't exist, try the controller pattern
+      const response = await api.get(`/portfolio/${portfolioId}/ml/status`);
+      return response.data;
+    }
+  },
+
+  /**
+   * Start ML model training for all stocks in a portfolio
+   * @param {string} portfolioId - The portfolio ID
+   * @param {boolean} useSampleData - Whether to use sample data (faster) or real data
+   * @returns {Promise} Training status
+   */
+  trainMLModels: async (portfolioId, useSampleData = false) => {
+    try {
+      const response = await api.post(`/ml/portfolio/${portfolioId}/train`, null, {
+        params: { useSampleData }
+      });
+      return response.data;
+    } catch (error) {
+      // If the endpoint doesn't exist, try the controller pattern
+      const response = await api.post(`/portfolio/${portfolioId}/ml/train`, null, {
+        params: { useSampleData }
+      });
+      return response.data;
+    }
+  },
+
+  /**
+   * Get personalized AI recommendations after ML models are trained
+   * This uses the trained neural networks to generate portfolio optimization suggestions
+   * @param {string} portfolioId - The portfolio ID
+   * @param {number} riskTolerance - Risk tolerance (0-1)
+   * @param {boolean} expandUniverse - Whether to consider new stocks
+   * @returns {Promise} AI recommendations based on ML predictions
+   */
+  getPersonalizedRecommendations: async (portfolioId, riskTolerance = 0.5, expandUniverse = false) => {
+    try {
+      const response = await api.get(`/ml/portfolio/${portfolioId}/recommendations`, {
+        params: { riskTolerance, expandUniverse }
+      });
+      return response.data;
+    } catch (error) {
+      // If the endpoint doesn't exist, use the AI portfolio upgrader
+      const response = await api.get(`/ai/portfolio/${portfolioId}/upgrade-recommendations`, {
+        params: { riskTolerance, expandUniverse }
+      });
+      return response.data;
+    }
+  },
+
+  /**
+   * Get portfolio performance metrics
+   * Shows how well AI recommendations have performed
+   */
+  getPortfolioPerformance: async (portfolioId) => {
+    const response = await api.get(`/ai/metrics/portfolio/${portfolioId}`);
+    return response.data;
+  },
+
+  /**
+   * Get portfolio history including AI recommendation applications
+   */
+  getPortfolioHistory: async (portfolioId) => {
+    const response = await api.get(`/portfolio-history/portfolio/${portfolioId}`);
+    return response.data;
+  },
+
+  /**
+   * Get AI recommendation history for a portfolio
+   */
+  getAIRecommendationHistory: async (portfolioId) => {
+    const response = await api.get(`/portfolio-history/portfolio/${portfolioId}/ai-recommendations`);
     return response.data;
   }
 };
