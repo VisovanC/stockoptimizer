@@ -28,6 +28,13 @@ public class MarketDataCollectorService {
         this.stockDataRepository = stockDataRepository;
     }
 
+    /**
+     * Overloaded method for backward compatibility - uses "system" as default userId
+     */
+    public List<StockData> fetchHistoricalData(String symbol, LocalDate from, LocalDate to) throws IOException {
+        return fetchHistoricalData(symbol, from, to, "system");
+    }
+
     public List<StockData> fetchHistoricalData(String symbol, LocalDate from, LocalDate to, String userId) throws IOException {
         // First check if user already has this data
         boolean dataExists = stockDataRepository.existsByUserIdAndSymbolAndDateBetween(userId, symbol, from, to);
@@ -128,7 +135,7 @@ public class MarketDataCollectorService {
         throw new IOException("Failed to fetch data for " + symbol + " after " + MAX_RETRIES + " attempts", lastException);
     }
 
-   public Map<String, List<StockData>> fetchHistoricalDataBatch(List<String> symbols, LocalDate from, LocalDate to) throws IOException {
+    public Map<String, List<StockData>> fetchHistoricalDataBatch(List<String> symbols, LocalDate from, LocalDate to, String userId) throws IOException {
         Map<String, List<StockData>> result = new HashMap<>();
 
         for (int i = 0; i < symbols.size(); i++) {
@@ -139,7 +146,7 @@ public class MarketDataCollectorService {
                     Thread.sleep(3000); // 3 seconds between different symbols
                 }
 
-                List<StockData> data = fetchHistoricalData(symbol, from, to);
+                List<StockData> data = fetchHistoricalData(symbol, from, to, userId);
                 result.put(symbol, data);
             } catch (IOException e) {
                 System.err.println("Error fetching data for " + symbol + ": " + e.getMessage());
@@ -153,6 +160,13 @@ public class MarketDataCollectorService {
         }
 
         return result;
+    }
+
+    /**
+     * Overloaded method for backward compatibility - uses "system" as default userId
+     */
+    public List<StockData> generateSampleData(String symbol, LocalDate from, LocalDate to) {
+        return generateSampleData(symbol, from, to, "system");
     }
 
     /**
@@ -222,7 +236,14 @@ public class MarketDataCollectorService {
         System.out.println("Saved " + stockDataList.size() + " stock data records for user " + userId);
     }
 
+    /**
+     * Overloaded method for backward compatibility
+     */
     public void collectInitialData(int years) throws IOException {
+        collectInitialData(years, "system");
+    }
+
+    public void collectInitialData(int years, String userId) throws IOException {
         List<String> symbols = Arrays.asList(
                 "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"
         );
@@ -232,12 +253,12 @@ public class MarketDataCollectorService {
 
         for (String symbol : symbols) {
             try {
-                List<StockData> data = fetchHistoricalData(symbol, startDate, endDate);
+                List<StockData> data = fetchHistoricalData(symbol, startDate, endDate, userId);
 
                 // If Yahoo Finance fails, use sample data
                 if (data.isEmpty()) {
                     System.out.println("Yahoo Finance unavailable, using sample data for " + symbol);
-                    data = generateSampleData(symbol, startDate, endDate);
+                    data = generateSampleData(symbol, startDate, endDate, userId);
                 }
 
                 if (!data.isEmpty()) {
@@ -246,7 +267,7 @@ public class MarketDataCollectorService {
                 }
             } catch (Exception e) {
                 System.err.println("Failed to collect data for " + symbol + ", using sample data");
-                List<StockData> sampleData = generateSampleData(symbol, startDate, endDate);
+                List<StockData> sampleData = generateSampleData(symbol, startDate, endDate, userId);
                 stockDataRepository.saveAll(sampleData);
             }
         }
@@ -255,10 +276,11 @@ public class MarketDataCollectorService {
     @Scheduled(cron = "0 0 18 * * MON-FRI", zone = "America/New_York")
     public void updateDailyData() {
         Set<String> symbols = stockDataRepository.findDistinctSymbols();
+        String systemUserId = "system"; // Use system user for scheduled tasks
 
         if (symbols.isEmpty()) {
             try {
-                collectInitialData(2);
+                collectInitialData(2, systemUserId);
             } catch (IOException e) {
                 System.err.println("Failed to collect initial data: " + e.getMessage());
             }
@@ -270,7 +292,7 @@ public class MarketDataCollectorService {
 
         for (String symbol : symbols) {
             try {
-                List<StockData> latestData = fetchHistoricalData(symbol, yesterday, today);
+                List<StockData> latestData = fetchHistoricalData(symbol, yesterday, today, systemUserId);
                 if (!latestData.isEmpty()) {
                     stockDataRepository.saveAll(latestData);
                 }

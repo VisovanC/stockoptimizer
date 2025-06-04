@@ -13,6 +13,8 @@ import com.cv.stockoptimizer.service.data.TechnicalIndicatorService;
 import com.cv.stockoptimizer.service.ml.NeuralNetworkService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -51,6 +53,14 @@ public class BackendTestController {
         this.stockPredictionRepository = stockPredictionRepository;
     }
 
+    private String getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            return authentication.getName();
+        }
+        return "system"; // Default user for test endpoints
+    }
+
     @GetMapping("/ping")
     public ResponseEntity<Map<String, Object>> ping() {
         Map<String, Object> response = new HashMap<>();
@@ -66,8 +76,9 @@ public class BackendTestController {
         try {
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusDays(days);
+            String userId = getCurrentUserId();
 
-            List<StockData> data = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate);
+            List<StockData> data = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate, userId);
 
             stockDataRepository.saveAll(data);
 
@@ -86,13 +97,15 @@ public class BackendTestController {
             return ResponseEntity.internalServerError().body(response);
         }
     }
+
     @GetMapping("/calculate-indicators/{symbol}")
     public ResponseEntity<Map<String, Object>> calculateIndicators(@PathVariable String symbol) {
         try {
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusDays(30);
+            String userId = getCurrentUserId();
 
-            List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(symbol, startDate, endDate);
+            List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(symbol, startDate, endDate, userId);
 
             Map<String, Object> response = new HashMap<>();
             response.put("symbol", symbol);
@@ -107,10 +120,12 @@ public class BackendTestController {
             return ResponseEntity.internalServerError().body(response);
         }
     }
+
     @GetMapping("/train-model/{symbol}")
     public ResponseEntity<Map<String, Object>> trainModel(@PathVariable String symbol) {
         try {
-            MLModel model = neuralNetworkService.trainModelForStock(symbol);
+            String userId = getCurrentUserId();
+            MLModel model = neuralNetworkService.trainModelForStock(symbol, userId);
 
             Map<String, Object> response = new HashMap<>();
             response.put("symbol", symbol);
@@ -129,10 +144,12 @@ public class BackendTestController {
             return ResponseEntity.internalServerError().body(response);
         }
     }
+
     @GetMapping("/predict/{symbol}")
     public ResponseEntity<Map<String, Object>> predict(@PathVariable String symbol) {
         try {
-            List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(symbol);
+            String userId = getCurrentUserId();
+            List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(symbol, userId);
             StockPrediction prediction = predictions.get(0);
 
             Map<String, Object> response = new HashMap<>();
@@ -153,9 +170,11 @@ public class BackendTestController {
             return ResponseEntity.internalServerError().body(response);
         }
     }
+
     @GetMapping("/database-status")
     public ResponseEntity<Map<String, Object>> databaseStatus() {
         Map<String, Object> status = new HashMap<>();
+        String userId = getCurrentUserId();
 
         status.put("stockDataCount", stockDataRepository.count());
         status.put("technicalIndicatorCount", technicalIndicatorRepository.count());
@@ -173,14 +192,14 @@ public class BackendTestController {
             LocalDate startDate = endDate.minusDays(7);
 
             status.put("recentStockData", stockDataRepository
-                    .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(sampleSymbol, startDate, endDate)
+                    .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, sampleSymbol, startDate, endDate)
                     .size());
 
             status.put("recentIndicators", technicalIndicatorRepository
-                    .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(sampleSymbol, startDate, endDate, model.getUserId)
+                    .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, sampleSymbol, startDate, endDate)
                     .size());
 
-            mlModelRepository.findBySymbol(sampleSymbol)
+            mlModelRepository.findByUserIdAndSymbol(userId, sampleSymbol)
                     .ifPresent(model -> status.put("modelInfo", Map.of(
                             "trainingDate", model.getTrainingDate(),
                             "error", model.getTrainingError()
@@ -189,35 +208,37 @@ public class BackendTestController {
 
         return ResponseEntity.ok(status);
     }
+
     @GetMapping("/end-to-end/{symbol}")
     public ResponseEntity<Map<String, Object>> endToEndTest(@PathVariable String symbol) {
         Map<String, Object> result = new HashMap<>();
         result.put("symbol", symbol);
+        String userId = getCurrentUserId();
 
         try {
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusYears(2);
-            List<StockData> data = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate, model.getUserId());
+            List<StockData> data = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate, userId);
             stockDataRepository.saveAll(data);
             result.put("dataCollection", Map.of(
                     "status", "success",
                     "dataPointsCollected", data.size()
             ));
 
-            List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(symbol, startDate, endDate, model.getUserId());
+            List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(symbol, startDate, endDate, userId);
             result.put("indicatorCalculation", Map.of(
                     "status", "success",
                     "indicatorsCalculated", indicators.size()
             ));
 
-            MLModel model = neuralNetworkService.trainModelForStock(symbol);
+            MLModel model = neuralNetworkService.trainModelForStock(symbol, userId);
             result.put("modelTraining", Map.of(
                     "status", "success",
                     "modelId", model.getId(),
                     "trainingError", model.getTrainingError()
             ));
 
-            List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(symbol, model.getUserId());
+            List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(symbol, userId);
             StockPrediction prediction = predictions.get(0);
             result.put("prediction", Map.of(
                     "status", "success",

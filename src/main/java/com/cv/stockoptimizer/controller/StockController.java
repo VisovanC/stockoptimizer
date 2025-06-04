@@ -23,7 +23,10 @@ import java.util.*;
 public class StockController {
     private String getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication.getName();
+        if (authentication != null && authentication.isAuthenticated()) {
+            return authentication.getName();
+        }
+        return "system"; // Default user
     }
 
     private final StockDataRepository stockDataRepository;
@@ -161,7 +164,8 @@ public class StockController {
     @PostMapping("/predictions/generate/{symbol}")
     public ResponseEntity<?> generatePrediction(@PathVariable String symbol) {
         try {
-            List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(symbol.toUpperCase());
+            String userId = getCurrentUserId();
+            List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(symbol.toUpperCase(), userId);
             StockPrediction prediction = predictions.get(0);
 
             Map<String, Object> response = new HashMap<>();
@@ -186,20 +190,21 @@ public class StockController {
     @PostMapping("/analysis/{symbol}")
     public ResponseEntity<?> analyzeStock(@PathVariable String symbol) {
         try {
+            String userId = getCurrentUserId();
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusYears(2);
 
             List<StockData> data = stockDataRepository.findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(
-                    getCurrentUserId(), symbol.toUpperCase(), startDate, endDate);
+                    userId, symbol.toUpperCase(), startDate, endDate);
 
             if (data.size() < 100) {
-                data = dataCollectorService.fetchHistoricalData(symbol.toUpperCase(), startDate, endDate, getCurrentUserId());
+                data = dataCollectorService.fetchHistoricalData(symbol.toUpperCase(), startDate, endDate, userId);
                 stockDataRepository.saveAll(data);
             }
 
             List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(
-                    symbol.toUpperCase(), startDate, endDate, getCurrentUserId());
-            List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(symbol.toUpperCase());
+                    symbol.toUpperCase(), startDate, endDate, userId);
+            List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(symbol.toUpperCase(), userId);
             StockPrediction prediction = predictions.get(0);
             Map<String, Object> analysis = new HashMap<>();
             analysis.put("symbol", symbol.toUpperCase());

@@ -145,6 +145,8 @@ public class PortfolioOptimizationService {
 
             // Get predictions for all stocks
             Map<String, StockPrediction> predictionMap = new HashMap<>();
+            String userId = portfolio.getUserId(); // Get userId from portfolio
+
             for (String symbol : symbols) {
                 List<StockPrediction> predictions = predictionRepository
                         .findBySymbolOrderByPredictionDateDesc(symbol);
@@ -152,7 +154,7 @@ public class PortfolioOptimizationService {
                     predictionMap.put(symbol, predictions.get(0));
                 } else {
                     // Generate new prediction if none exists
-                    List<StockPrediction> newPredictions = neuralNetworkService.predictFuturePrices(symbol);
+                    List<StockPrediction> newPredictions = neuralNetworkService.predictFuturePrices(symbol, userId);
                     if (!newPredictions.isEmpty()) {
                         predictionMap.put(symbol, newPredictions.get(0));
                     }
@@ -615,11 +617,23 @@ public class PortfolioOptimizationService {
 
         // Get predictions for portfolio stocks
         Map<String, StockPrediction> predictions = new HashMap<>();
+        String userId = portfolio.getUserId();
+
         for (Portfolio.PortfolioStock stock : portfolio.getStocks()) {
             List<StockPrediction> stockPredictions = predictionRepository
                     .findBySymbolOrderByPredictionDateDesc(stock.getSymbol());
             if (!stockPredictions.isEmpty()) {
                 predictions.put(stock.getSymbol(), stockPredictions.get(0));
+            } else {
+                // Generate prediction if none exists
+                try {
+                    List<StockPrediction> newPredictions = neuralNetworkService.predictFuturePrices(stock.getSymbol(), userId);
+                    if (!newPredictions.isEmpty()) {
+                        predictions.put(stock.getSymbol(), newPredictions.get(0));
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error generating prediction for " + stock.getSymbol() + ": " + e.getMessage());
+                }
             }
         }
 

@@ -75,8 +75,6 @@ public class NeuralNetworkService {
                     (INPUT_WINDOW + PREDICTION_DAYS) + " data points, but only have " + indicators.size());
         }
 
-
-
         // Prepare data pairs (input -> output)
         MLDataSet dataSet = new BasicMLDataSet();
         int validPairs = 0;
@@ -97,7 +95,6 @@ public class NeuralNetworkService {
                 }
 
                 // Fill input vector with technical indicators for INPUT_WINDOW days
-                // In prepareTrainingData() method, update the input preparation similarly:
                 for (int j = i; j < i + INPUT_WINDOW; j++) {
                     TechnicalIndicator indicator = indicators.get(j);
 
@@ -223,8 +220,6 @@ public class NeuralNetworkService {
 
         System.out.println("Training complete after " + epoch + " epochs. Final error: " + error);
         return error;
-
-
     }
 
     /**
@@ -263,7 +258,7 @@ public class NeuralNetworkService {
         }
 
         // Save the network
-        String modelFilePath = MODEL_DIRECTORY + symbol + "_model.eg";
+        String modelFilePath = MODEL_DIRECTORY + symbol + "_" + userId + "_model.eg";
         try {
             File modelFile = new File(modelFilePath);
             EncogDirectoryPersistence.saveObject(modelFile, network);
@@ -273,11 +268,8 @@ public class NeuralNetworkService {
             throw new IOException("Failed to save model for " + symbol + ": " + e.getMessage());
         }
 
-
-
         MLModel model = existingModel.orElse(new MLModel());
         model.setUserId(userId);
-        model.setSymbol(symbol);
         model.setSymbol(symbol);
         model.setModelType("PRICE_PREDICTION");
         model.setInputWindow(INPUT_WINDOW);
@@ -293,15 +285,15 @@ public class NeuralNetworkService {
         MLModel savedModel = mlModelRepository.save(model);
         System.out.println("Model metadata saved for " + symbol);
 
-        return mlModelRepository.save(model);
+        return savedModel;
     }
 
     /**
      * Load a trained model for a given stock
      */
-    public BasicNetwork loadModel(String symbol) throws IOException {
-        // First try to find with system userId
-        MLModel modelInfo = mlModelRepository.findByUserIdAndSymbol("system", symbol)
+    public BasicNetwork loadModel(String symbol, String userId) throws IOException {
+        // First try to find with the specific userId
+        MLModel modelInfo = mlModelRepository.findByUserIdAndSymbol(userId, symbol)
                 .orElseGet(() -> mlModelRepository.findBySymbol(symbol)
                         .orElseThrow(() -> new IllegalArgumentException("No trained model exists for " + symbol)));
 
@@ -324,7 +316,7 @@ public class NeuralNetworkService {
         System.out.println("Generating predictions for " + symbol + " for user " + userId);
 
         // Load the model for this user
-        BasicNetwork network = loadModel(symbol);
+        BasicNetwork network = loadModel(symbol, userId);
 
         // Get recent data for this user
         LocalDate today = LocalDate.now();
@@ -332,7 +324,6 @@ public class NeuralNetworkService {
 
         List<TechnicalIndicator> recentData = technicalIndicatorRepository
                 .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, symbol, startDate, today);
-
 
         System.out.println("Found " + recentData.size() + " recent data points for " + symbol);
 
@@ -354,7 +345,6 @@ public class NeuralNetworkService {
         // Extract the last INPUT_WINDOW days of data
         List<TechnicalIndicator> inputWindow = recentData.subList(
                 recentData.size() - INPUT_WINDOW, recentData.size());
-
 
         // Prepare input for the neural network
         double[] input = new double[INPUT_WINDOW * 10];
@@ -394,12 +384,14 @@ public class NeuralNetworkService {
         double currentPrice = inputWindow.get(inputWindow.size() - 1).getPrice();
 
         System.out.println("Base price: " + basePrice);
+        System.out.println("Current price: " + currentPrice);
         System.out.println("Input window size: " + inputWindow.size());
 
         // Check for NaN in input
         for (int i = 0; i < input.length; i++) {
             if (Double.isNaN(input[i]) || Double.isInfinite(input[i])) {
                 System.err.println("Invalid input at index " + i + ": " + input[i]);
+                input[i] = 0.0; // Default to 0
             }
         }
 
@@ -417,7 +409,7 @@ public class NeuralNetworkService {
 
         // Calculate predicted price
         double predictedPrice = currentPrice * (1 + predictedChangePercentage);
-        System.out.println("Current price: " + currentPrice + ", Predicted price: " + predictedPrice);
+        System.out.println("Predicted price: " + predictedPrice);
 
         // Create prediction record
         StockPrediction prediction = new StockPrediction();
@@ -435,7 +427,7 @@ public class NeuralNetworkService {
         System.out.println("Prediction saved for " + symbol + ": " +
                 String.format("%.2f%%", predictedChangePercentage * 100));
 
-        return predictFuturePrices(symbol, "system");
+        return Collections.singletonList(savedPrediction);
     }
 
     /**
@@ -446,6 +438,9 @@ public class NeuralNetworkService {
         return Math.min(100, Math.abs(normalizedPrediction) * 100);
     }
 
+    /**
+     * Overloaded method for backward compatibility
+     */
     public MLModel trainModelForStock(String symbol) throws IOException {
         // Use a default userId or system userId for backward compatibility
         return trainModelForStock(symbol, "system");
@@ -454,7 +449,7 @@ public class NeuralNetworkService {
     /**
      * Create and train models for multiple stocks
      */
-   /* public Map<String, MLModel> trainModelsForMultipleStocks(List<String> symbols) {
+    public Map<String, MLModel> trainModelsForMultipleStocks(List<String> symbols, String userId) {
         Map<String, MLModel> results = new HashMap<>();
 
         for (String symbol : symbols) {
@@ -469,5 +464,5 @@ public class NeuralNetworkService {
         }
 
         return results;
-    }*/
+    }
 }

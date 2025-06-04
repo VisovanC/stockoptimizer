@@ -75,6 +75,7 @@ public class AIPortfolioUpgraderService {
      * @param stockUniverseExpansion Whether to consider adding new stocks to the portfolio
      * @return Map containing upgrade recommendations and statistics
      */
+    @Cacheable(value = "portfolioRecommendations", key = "#portfolioId + '-' + #riskTolerance + '-' + #stockUniverseExpansion")
     public Map<String, Object> generatePortfolioUpgrade(
             String portfolioId,
             double riskTolerance,
@@ -97,7 +98,7 @@ public class AIPortfolioUpgraderService {
         }
 
         // Collect required data for analysis
-        Map<String, AnalysisData> stockAnalysisData = collectStockAnalysisData(analyzedSymbols);
+        Map<String, AnalysisData> stockAnalysisData = collectStockAnalysisData(analyzedSymbols, portfolio.getUserId());
 
         // Create portfolio allocation model using predictive AI
         Map<String, Double> optimizedAllocations = calculateOptimalAllocations(
@@ -139,6 +140,7 @@ public class AIPortfolioUpgraderService {
      * @param optimizedAllocations Map of symbol to allocation percentage
      * @return Updated portfolio entity
      */
+    @CacheEvict(value = "portfolioRecommendations", key = "#portfolioId + '*'")
     public Portfolio applyPortfolioUpgrade(String portfolioId, Map<String, Double> optimizedAllocations) {
         Portfolio portfolio = portfolioRepository.findById(portfolioId)
                 .orElseThrow(() -> new IllegalArgumentException("Portfolio not found"));
@@ -254,7 +256,7 @@ public class AIPortfolioUpgraderService {
         return portfolioRepository.save(portfolio);
     }
 
-    // Private helper methods (keeping them simple for space)
+    // Private helper methods
 
     private void updatePortfolioTotals(Portfolio portfolio) {
         double totalValue = 0;
@@ -289,7 +291,7 @@ public class AIPortfolioUpgraderService {
         for (String symbol : potentialSymbols) {
             if (!currentSymbols.contains(symbol) && allAvailableSymbols.contains(symbol)) {
                 expandedSymbols.add(symbol);
-                if (expandedSymbols.size() >= 10) {
+                if (expandedSymbols.size() >= config.getMaxExpansionStocks()) {
                     break;
                 }
             }
@@ -298,10 +300,10 @@ public class AIPortfolioUpgraderService {
         return expandedSymbols;
     }
 
-    private Map<String, AnalysisData> collectStockAnalysisData(Set<String> symbols) throws IOException {
+    private Map<String, AnalysisData> collectStockAnalysisData(Set<String> symbols, String userId) throws IOException {
         Map<String, AnalysisData> analysisDataMap = new HashMap<>();
         LocalDate today = LocalDate.now();
-        LocalDate startDate = today.minusDays(HISTORICAL_DAYS);
+        LocalDate startDate = today.minusDays(config.getHistoricalDays());
 
         for (String symbol : symbols) {
             try {
@@ -336,7 +338,7 @@ public class AIPortfolioUpgraderService {
                 if (!predictions.isEmpty()) {
                     prediction = predictions.get(0);
                 } else {
-                    List<StockPrediction> generatedPredictions = neuralNetworkService.predictFuturePrices(symbol);
+                    List<StockPrediction> generatedPredictions = neuralNetworkService.predictFuturePrices(symbol, userId);
                     prediction = generatedPredictions.get(0);
                 }
 
@@ -386,13 +388,51 @@ public class AIPortfolioUpgraderService {
 
         Map<String, Double> allocations = new HashMap<>();
 
-        // Initialize equal weights
-        for (String symbol : analysisData.keySet()) {
-            allocations.put(symbol, 1.0 / analysisData.size());
+        // Score each stock based on return, risk, and confidence
+        Map<String, Double> stockScores = new HashMap<>();
+
+        for (Map.Entry<String, AnalysisData> entry : analysisData.entrySet()) {
+            String symbol = entry.getKey();
+            AnalysisData data = entry.getValue();
+
+            // Calculate composite score
+            double returnScore = data.predictedReturn * data.confidenceScore;
+            double riskAdjustedScore = returnScore - (data.volatility * (1 - riskTolerance));
+            double sharpeBonus = Math.max(0, data.sharpeRatio * 0.1);
+
+            double totalScore = riskAdjustedScore + sharpeBonus;
+
+            // Give bonus to existing stocks (less transaction costs)
+            if (currentSymbols.contains(symbol)) {
+                totalScore *= 1.1;
+            }
+
+            stockScores.put(symbol, Math.max(0, totalScore));
         }
 
-        // Simple optimization - in reality you'd use more sophisticated algorithms
-        // This is a placeholder implementation
+        // Normalize scores to create allocations
+        double totalScore = stockScores.values().stream().mapToDouble(Double::doubleValue).sum();
+
+        if (totalScore > 0) {
+            for (Map.Entry<String, Double> entry : stockScores.entrySet()) {
+                double allocation = entry.getValue() / totalScore;
+
+                // Apply constraints
+                allocation = Math.min(allocation, config.getMaxStockAllocation());
+                if (allocation >= config.getMinStockAllocation()) {
+                    allocations.put(entry.getKey(), allocation);
+                }
+            }
+        }
+
+        // Re-normalize after constraints
+        double sum = allocations.values().stream().mapToDouble(Double::doubleValue).sum();
+        if (sum > 0 && Math.abs(sum - 1.0) > 0.01) {
+            for (String symbol : allocations.keySet()) {
+                allocations.put(symbol, allocations.get(symbol) / sum);
+            }
+        }
+
         return allocations;
     }
 
@@ -401,8 +441,74 @@ public class AIPortfolioUpgraderService {
             Map<String, Double> optimizedAllocations,
             Map<String, AnalysisData> analysisData) {
 
-        // Simplified implementation
-        return new ArrayList<>();
+        List<StockAction> actions = new ArrayList<>();
+        double totalValue = portfolio.getTotalValue() != null ? portfolio.getTotalValue() : 0;
+
+        // Current holdings
+        Map<String, Portfolio.PortfolioStock> currentHoldings = portfolio.getStocks().stream()
+                .collect(Collectors.toMap(Portfolio.PortfolioStock::getSymbol, s -> s));
+
+        // Generate actions for each symbol
+        for (Map.Entry<String, Double> entry : optimizedAllocations.entrySet()) {
+            String symbol = entry.getKey();
+            double targetAllocation = entry.getValue();
+
+            StockAction action = new StockAction();
+            action.symbol = symbol;
+
+            Portfolio.PortfolioStock currentStock = currentHoldings.get(symbol);
+            if (currentStock != null) {
+                action.currentShares = currentStock.getShares();
+                double currentValue = currentStock.getCurrentPrice() * currentStock.getShares();
+                double currentAllocation = currentValue / totalValue;
+
+                double targetValue = totalValue * targetAllocation;
+                action.targetShares = (int) Math.floor(targetValue / currentStock.getCurrentPrice());
+                action.currentPrice = currentStock.getCurrentPrice();
+
+                if (action.targetShares > action.currentShares) {
+                    action.action = "BUY";
+                    action.reason = String.format("Increase allocation from %.1f%% to %.1f%%",
+                            currentAllocation * 100, targetAllocation * 100);
+                } else if (action.targetShares < action.currentShares) {
+                    action.action = "SELL";
+                    action.reason = String.format("Decrease allocation from %.1f%% to %.1f%%",
+                            currentAllocation * 100, targetAllocation * 100);
+                } else {
+                    action.action = "HOLD";
+                    action.reason = "Current allocation is optimal";
+                }
+            } else {
+                action.currentShares = 0;
+                action.action = "BUY";
+
+                AnalysisData data = analysisData.get(symbol);
+                if (data != null) {
+                    action.currentPrice = data.currentPrice;
+                    action.targetShares = (int) Math.floor((totalValue * targetAllocation) / data.currentPrice);
+                    action.reason = String.format("New position with %.1f%% allocation, expected return: %.1f%%",
+                            targetAllocation * 100, data.predictedReturn * 100);
+                }
+            }
+
+            actions.add(action);
+        }
+
+        // Add SELL actions for stocks not in optimized portfolio
+        for (Portfolio.PortfolioStock stock : portfolio.getStocks()) {
+            if (!optimizedAllocations.containsKey(stock.getSymbol())) {
+                StockAction action = new StockAction();
+                action.symbol = stock.getSymbol();
+                action.action = "SELL";
+                action.currentShares = stock.getShares();
+                action.targetShares = 0;
+                action.currentPrice = stock.getCurrentPrice();
+                action.reason = "Remove from portfolio - better opportunities available";
+                actions.add(action);
+            }
+        }
+
+        return actions;
     }
 
     private Map<String, Object> calculateExpectedPerformance(
@@ -410,9 +516,33 @@ public class AIPortfolioUpgraderService {
             Map<String, AnalysisData> analysisData) {
 
         Map<String, Object> performance = new HashMap<>();
-        performance.put("expectedAnnualReturn", 8.5);
-        performance.put("expectedAnnualVolatility", 15.2);
-        performance.put("sharpeRatio", 0.56);
+
+        double expectedReturn = 0;
+        double expectedVolatility = 0;
+
+        // Calculate weighted average return
+        for (Map.Entry<String, Double> entry : allocations.entrySet()) {
+            String symbol = entry.getKey();
+            double allocation = entry.getValue();
+            AnalysisData data = analysisData.get(symbol);
+
+            if (data != null) {
+                expectedReturn += allocation * data.predictedReturn;
+                expectedVolatility += allocation * allocation * data.volatility * data.volatility;
+            }
+        }
+
+        expectedVolatility = Math.sqrt(expectedVolatility);
+
+        // Calculate Sharpe ratio
+        double riskFreeRate = 0.02; // 2% annual
+        double sharpeRatio = (expectedReturn - riskFreeRate) / expectedVolatility;
+
+        performance.put("expectedAnnualReturn", expectedReturn * 100);
+        performance.put("expectedAnnualVolatility", expectedVolatility * 100);
+        performance.put("sharpeRatio", sharpeRatio);
+        performance.put("riskAdjustedReturn", expectedReturn - expectedVolatility);
+
         return performance;
     }
 
@@ -422,9 +552,46 @@ public class AIPortfolioUpgraderService {
             Map<String, AnalysisData> analysisData) {
 
         Map<String, Object> metrics = new HashMap<>();
-        metrics.put("returnImprovement", 2.1);
-        metrics.put("riskReduction", 1.5);
-        metrics.put("overallImprovementScore", 75.0);
+
+        // Calculate current portfolio metrics
+        double currentReturn = 0;
+        double currentVolatility = 0;
+        double totalValue = portfolio.getTotalValue() != null ? portfolio.getTotalValue() : 0;
+
+        if (totalValue > 0) {
+            for (Portfolio.PortfolioStock stock : portfolio.getStocks()) {
+                double allocation = (stock.getCurrentPrice() * stock.getShares()) / totalValue;
+                AnalysisData data = analysisData.get(stock.getSymbol());
+
+                if (data != null) {
+                    currentReturn += allocation * data.predictedReturn;
+                    currentVolatility += allocation * allocation * data.volatility * data.volatility;
+                }
+            }
+            currentVolatility = Math.sqrt(currentVolatility);
+        }
+
+        // Calculate optimized portfolio metrics
+        Map<String, Object> optimizedPerformance = calculateExpectedPerformance(optimizedAllocations, analysisData);
+        double optimizedReturn = (Double) optimizedPerformance.get("expectedAnnualReturn") / 100;
+        double optimizedVolatility = (Double) optimizedPerformance.get("expectedAnnualVolatility") / 100;
+
+        // Calculate improvements
+        double returnImprovement = (optimizedReturn - currentReturn) * 100;
+        double riskReduction = (currentVolatility - optimizedVolatility) * 100;
+
+        // Calculate overall improvement score (0-100)
+        double improvementScore = 0;
+        if (returnImprovement > 0) improvementScore += 50 * (returnImprovement / 10); // Max 50 points for 10% return improvement
+        if (riskReduction > 0) improvementScore += 50 * (riskReduction / 10); // Max 50 points for 10% risk reduction
+        improvementScore = Math.min(100, Math.max(0, improvementScore));
+
+        metrics.put("currentExpectedReturn", currentReturn * 100);
+        metrics.put("currentVolatility", currentVolatility * 100);
+        metrics.put("returnImprovement", returnImprovement);
+        metrics.put("riskReduction", riskReduction);
+        metrics.put("overallImprovementScore", improvementScore);
+
         return metrics;
     }
 
@@ -446,7 +613,14 @@ public class AIPortfolioUpgraderService {
     }
 
     private double calculatePortfolioRiskScore(Portfolio portfolio) {
-        return 50.0; // Simplified implementation
+        // Simplified risk score calculation based on diversification and volatility
+        int stockCount = portfolio.getStocks().size();
+        double diversificationScore = Math.min(stockCount / 10.0, 1.0) * 50;
+
+        // Add volatility component (simplified)
+        double volatilityScore = 50; // Default medium risk
+
+        return diversificationScore + (100 - diversificationScore) * (volatilityScore / 100);
     }
 
     private String getCompanyName(String symbol) {
@@ -454,11 +628,30 @@ public class AIPortfolioUpgraderService {
         commonStocks.put("AAPL", "Apple Inc.");
         commonStocks.put("MSFT", "Microsoft Corporation");
         commonStocks.put("GOOGL", "Alphabet Inc.");
+        commonStocks.put("AMZN", "Amazon.com, Inc.");
+        commonStocks.put("META", "Meta Platforms, Inc.");
+        commonStocks.put("TSLA", "Tesla, Inc.");
+        commonStocks.put("NVDA", "NVIDIA Corporation");
+        commonStocks.put("JPM", "JPMorgan Chase & Co.");
         return commonStocks.getOrDefault(symbol, symbol + " Corp");
     }
 
     private double calculateAIConfidenceScore(Map<String, AnalysisData> analysisData) {
-        return 75.0; // Simplified implementation
+        if (analysisData.isEmpty()) return 0;
+
+        // Average confidence score across all analyzed stocks
+        double avgConfidence = analysisData.values().stream()
+                .mapToDouble(data -> data.confidenceScore)
+                .average()
+                .orElse(0);
+
+        // Factor in data quality (more data points = higher confidence)
+        double dataQuality = analysisData.values().stream()
+                .mapToDouble(data -> Math.min(data.historicalReturns.size() / 250.0, 1.0))
+                .average()
+                .orElse(0);
+
+        return (avgConfidence * 0.7 + dataQuality * 0.3) * 100;
     }
 
     // Inner classes

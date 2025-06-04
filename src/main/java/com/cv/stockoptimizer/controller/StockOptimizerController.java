@@ -13,6 +13,8 @@ import com.cv.stockoptimizer.service.data.TechnicalIndicatorService;
 import com.cv.stockoptimizer.service.ml.NeuralNetworkService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -51,6 +53,14 @@ public class StockOptimizerController {
         this.stockPredictionRepository = stockPredictionRepository;
     }
 
+    private String getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            return authentication.getName();
+        }
+        return "system"; // Default user for unauthenticated requests
+    }
+
     /**
      * Get all available stock symbols in the database
      */
@@ -72,10 +82,12 @@ public class StockOptimizerController {
         try {
             LocalDate end = endDate != null ? LocalDate.parse(endDate) : LocalDate.now();
             LocalDate start = startDate != null ? LocalDate.parse(startDate) : end.minusYears(2);
+            String userId = getCurrentUserId();
 
             List<StockData> data = dataCollectorService.fetchHistoricalData(
-                    symbol.toUpperCase(), start, end);
+                    symbol.toUpperCase(), start, end, userId);
             stockDataRepository.saveAll(data);
+
             Map<String, Object> response = new HashMap<>();
             response.put("symbol", symbol);
             response.put("startDate", start);
@@ -99,9 +111,10 @@ public class StockOptimizerController {
             @RequestParam(required = false) String endDate) {
         LocalDate end = endDate != null ? LocalDate.parse(endDate) : LocalDate.now();
         LocalDate start = startDate != null ? LocalDate.parse(startDate) : end.minusMonths(3);
+        String userId = getCurrentUserId();
 
         List<StockData> data = stockDataRepository.findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(
-                stockDataRepository.userId(userId()),symbol.toUpperCase(), start, end);
+                userId, symbol.toUpperCase(), start, end);
 
         return ResponseEntity.ok(data);
     }
@@ -115,9 +128,11 @@ public class StockOptimizerController {
         try {
             LocalDate end = endDate != null ? LocalDate.parse(endDate) : LocalDate.now();
             LocalDate start = startDate != null ? LocalDate.parse(startDate) : end.minusYears(2);
+            String userId = getCurrentUserId();
 
             List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(
-                    symbol.toUpperCase(), start, end);
+                    symbol.toUpperCase(), start, end, userId);
+
             Map<String, Object> response = new HashMap<>();
             response.put("symbol", symbol);
             response.put("startDate", start);
@@ -147,10 +162,12 @@ public class StockOptimizerController {
 
         return ResponseEntity.ok(indicators);
     }
+
     @PostMapping("/models/train/{symbol}")
     public ResponseEntity<?> trainModel(@PathVariable String symbol) {
         try {
-            MLModel model = neuralNetworkService.trainModelForStock(symbol.toUpperCase());
+            String userId = getCurrentUserId();
+            MLModel model = neuralNetworkService.trainModelForStock(symbol.toUpperCase(), userId);
 
             Map<String, Object> response = new HashMap<>();
             response.put("symbol", symbol);
@@ -193,11 +210,13 @@ public class StockOptimizerController {
             ));
         }
     }
+
     @PostMapping("/predictions/generate/{symbol}")
     public ResponseEntity<?> generatePrediction(@PathVariable String symbol) {
         try {
+            String userId = getCurrentUserId();
             List<StockPrediction> predictions =
-                    neuralNetworkService.predictFuturePrices(symbol.toUpperCase());
+                    neuralNetworkService.predictFuturePrices(symbol.toUpperCase(), userId);
 
             if (predictions.isEmpty()) {
                 return ResponseEntity.status(404).body(Map.of(
@@ -205,6 +224,7 @@ public class StockOptimizerController {
                         "message", "No predictions could be generated"
                 ));
             }
+
             StockPrediction prediction = predictions.get(0);
             Map<String, Object> response = new HashMap<>();
             response.put("symbol", symbol);
@@ -240,35 +260,39 @@ public class StockOptimizerController {
     public ResponseEntity<?> processStock(@PathVariable String symbol) {
         Map<String, Object> result = new HashMap<>();
         result.put("symbol", symbol.toUpperCase());
+        String userId = getCurrentUserId();
 
         try {
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusYears(2);
 
             List<StockData> data = dataCollectorService.fetchHistoricalData(
-                    symbol.toUpperCase(), startDate, endDate);
+                    symbol.toUpperCase(), startDate, endDate, userId);
             stockDataRepository.saveAll(data);
 
             result.put("dataCollection", Map.of(
                     "status", "success",
                     "dataPoints", data.size()
             ));
+
             List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(
-                    symbol.toUpperCase(), startDate, endDate);
+                    symbol.toUpperCase(), startDate, endDate, userId);
 
             result.put("indicatorCalculation", Map.of(
                     "status", "success",
                     "indicators", indicators.size()
             ));
-            MLModel model = neuralNetworkService.trainModelForStock(symbol.toUpperCase());
+
+            MLModel model = neuralNetworkService.trainModelForStock(symbol.toUpperCase(), userId);
 
             result.put("modelTraining", Map.of(
                     "status", "success",
                     "modelId", model.getId(),
                     "trainingError", model.getTrainingError()
             ));
+
             List<StockPrediction> predictions =
-                    neuralNetworkService.predictFuturePrices(symbol.toUpperCase());
+                    neuralNetworkService.predictFuturePrices(symbol.toUpperCase(), userId);
 
             if (!predictions.isEmpty()) {
                 StockPrediction prediction = predictions.get(0);
