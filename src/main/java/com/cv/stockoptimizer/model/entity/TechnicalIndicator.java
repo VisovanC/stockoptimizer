@@ -6,9 +6,10 @@ import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
+
 @Document(collection = "technical_indicators")
 @CompoundIndexes({
-        @CompoundIndex(name = "symbol_date_idx", def = "{'symbol': 1, 'date': 1}", unique = true)
+        @CompoundIndex(name = "userId_symbol_date_idx", def = "{'userId': 1, 'symbol': 1, 'date': 1}", unique = true)
 })
 public class TechnicalIndicator {
     @Id
@@ -28,6 +29,7 @@ public class TechnicalIndicator {
     private Double bollingerUpper;
     private Double bollingerMiddle;
     private Double bollingerLower;
+
     public String getId() {
         return id;
     }
@@ -143,5 +145,4 @@ public class TechnicalIndicator {
     public String getUserId() { return userId; }
 
     public void setUserId(String userId) { this.userId = userId; }
-
 }

@@ -9,7 +9,7 @@ import java.time.LocalDate;
 
 @Document(collection = "stock_data")
 @CompoundIndexes({
-        @CompoundIndex(name = "symbol_date_idx", def = "{'symbol': 1, 'date': 1}", unique = true)
+        @CompoundIndex(name = "userId_symbol_date_idx", def = "{'userId': 1, 'symbol': 1, 'date': 1}", unique = true)
 })
 public class StockData {
     @Id
@@ -121,7 +121,3 @@ public class StockData {
 
     public void setUserId(String userId) { this.userId = userId; }
 }
-
-
-
-
