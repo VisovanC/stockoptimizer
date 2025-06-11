@@ -28,17 +28,17 @@ const Dashboard = () => {
     };
 
     const calculateTotalValue = () => {
-        return portfolios.reduce((total, portfolio) => total + (portfolio.totalValue || 0), 0);
+        return portfolios.reduce((total, portfolio) => total + (parseFloat(portfolio.totalValue) || 0), 0);
     };
 
     const calculateTotalReturn = () => {
-        return portfolios.reduce((total, portfolio) => total + (portfolio.totalReturn || 0), 0);
+        return portfolios.reduce((total, portfolio) => total + (parseFloat(portfolio.totalReturn) || 0), 0);
     };
 
     const getPortfolioChartData = () => {
         return portfolios.map(portfolio => ({
             name: portfolio.name,
-            value: portfolio.totalValue || 0
+            value: parseFloat(portfolio.totalValue) || 0
         }));
     };
 
@@ -49,7 +49,7 @@ const Dashboard = () => {
                 portfolio.stocks.forEach(stock => {
                     allStocks.push({
                         symbol: stock.symbol,
-                        return: stock.returnPercentage || 0
+                        return: parseFloat(stock.returnPercentage) || 0
                     });
                 });
             }
@@ -60,40 +60,43 @@ const Dashboard = () => {
             .slice(0, 5);
     };
 
-    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+    const COLORS = ['#FF6500', '#1E3E62', '#0B192C', '#FF8642', '#2E5E92'];
 
     if (loading) return <Container className="py-4">Loading...</Container>;
 
     return (
         <Container className="py-4">
-            <h1 className="mb-4">Welcome back, {user?.username}!</h1>
+            <div className="dashboard-header mb-4">
+                <h1 className="mb-0">Welcome back, {user?.username}!</h1>
+                <p className="mb-0 opacity-75">Here's your portfolio overview</p>
+            </div>
 
             {error && <Alert variant="danger">{error}</Alert>}
 
             <Row className="mb-4">
                 <Col md={4}>
-                    <Card className="h-100">
+                    <Card className="h-100 hover-lift">
                         <Card.Body>
-                            <h5 className="text-muted">Total Portfolio Value</h5>
-                            <h2 className="text-primary">${calculateTotalValue().toFixed(2)}</h2>
+                            <h5 className="text-muted mb-3">Total Portfolio Value</h5>
+                            <h2 className="portfolio-value">${calculateTotalValue().toFixed(2)}</h2>
                         </Card.Body>
                     </Card>
                 </Col>
                 <Col md={4}>
-                    <Card className="h-100">
+                    <Card className="h-100 hover-lift">
                         <Card.Body>
-                            <h5 className="text-muted">Total Return</h5>
-                            <h2 className={calculateTotalReturn() >= 0 ? 'text-success' : 'text-danger'}>
+                            <h5 className="text-muted mb-3">Total Return</h5>
+                            <h2 className={calculateTotalReturn() >= 0 ? 'portfolio-return-positive' : 'portfolio-return-negative'}>
                                 ${calculateTotalReturn().toFixed(2)}
                             </h2>
                         </Card.Body>
                     </Card>
                 </Col>
                 <Col md={4}>
-                    <Card className="h-100">
+                    <Card className="h-100 hover-lift">
                         <Card.Body>
-                            <h5 className="text-muted">Number of Portfolios</h5>
-                            <h2>{portfolios.length}</h2>
+                            <h5 className="text-muted mb-3">Number of Portfolios</h5>
+                            <h2 className="portfolio-value">{portfolios.length}</h2>
                         </Card.Body>
                     </Card>
                 </Col>
@@ -101,9 +104,9 @@ const Dashboard = () => {
 
             <Row className="mb-4">
                 <Col md={6}>
-                    <Card>
+                    <Card className="hover-lift">
                         <Card.Header>
-                            <h5>Portfolio Distribution</h5>
+                            <h5 className="mb-0">Portfolio Distribution</h5>
                         </Card.Header>
                         <Card.Body>
                             {portfolios.length > 0 ? (
@@ -134,9 +137,9 @@ const Dashboard = () => {
                 </Col>
 
                 <Col md={6}>
-                    <Card>
+                    <Card className="hover-lift">
                         <Card.Header>
-                            <h5>Top Performers</h5>
+                            <h5 className="mb-0">Top Performers</h5>
                         </Card.Header>
                         <Card.Body>
                             {getTopPerformers().length > 0 ? (
@@ -146,7 +149,7 @@ const Dashboard = () => {
                                         <XAxis dataKey="symbol" />
                                         <YAxis />
                                         <Tooltip formatter={(value) => `${value.toFixed(2)}%`} />
-                                        <Bar dataKey="return" fill="#82ca9d" />
+                                        <Bar dataKey="return" fill="#FF6500" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             ) : (
@@ -159,9 +162,9 @@ const Dashboard = () => {
 
             <Row>
                 <Col>
-                    <Card>
+                    <Card className="hover-lift">
                         <Card.Header className="d-flex justify-content-between align-items-center">
-                            <h5>Quick Actions</h5>
+                            <h5 className="mb-0">Quick Actions</h5>
                         </Card.Header>
                         <Card.Body>
                             <div className="d-grid gap-2 d-md-flex">

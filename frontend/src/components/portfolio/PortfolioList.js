@@ -109,8 +109,8 @@ const PortfolioList = () => {
                                     </td>
                                     <td>{portfolio.stocks?.length || 0}</td>
                                     <td>${(portfolio.totalValue || 0).toFixed(2)}</td>
-                                    <td className={portfolio.totalReturnPercentage >= 0 ? 'text-success' : 'text-danger'}>
-                                        {portfolio.totalReturnPercentage?.toFixed(2)}%
+                                    <td className={(parseFloat(portfolio.totalReturnPercentage) || 0) >= 0 ? 'text-success' : 'text-danger'}>
+                                        {(parseFloat(portfolio.totalReturnPercentage) || 0).toFixed(2)}%
                                     </td>
                                     <td>{getStatusBadge(portfolio.optimizationStatus)}</td>
                                     <td>

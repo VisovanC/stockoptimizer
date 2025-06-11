@@ -36,11 +36,19 @@ const Login = () => {
     };
 
     return (
-        <Container className="d-flex align-items-center justify-content-center" style={{ minHeight: '100vh' }}>
+        <Container className="d-flex align-items-center justify-content-center" style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, #0B192C 0%, #1E3E62 100%)'
+        }}>
             <div style={{ maxWidth: '400px', width: '100%' }}>
-                <Card>
-                    <Card.Body>
-                        <h2 className="text-center mb-4">Login</h2>
+                <Card style={{ borderRadius: '15px', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+                    <Card.Body style={{ padding: '2.5rem' }}>
+                        <h2 className="text-center mb-4" style={{ color: '#0B192C', fontWeight: '700' }}>
+                            Welcome Back
+                        </h2>
+                        <p className="text-center text-muted mb-4">
+                            Sign in to your account to continue
+                        </p>
                         {error && <Alert variant="danger">{error}</Alert>}
                         <Form onSubmit={handleSubmit}>
                             <Form.Group className="mb-3">
@@ -51,10 +59,11 @@ const Login = () => {
                                     value={formData.username}
                                     onChange={handleChange}
                                     required
+                                    placeholder="Enter your username"
                                 />
                             </Form.Group>
 
-                            <Form.Group className="mb-3">
+                            <Form.Group className="mb-4">
                                 <Form.Label>Password</Form.Label>
                                 <Form.Control
                                     type="password"
@@ -62,6 +71,7 @@ const Login = () => {
                                     value={formData.password}
                                     onChange={handleChange}
                                     required
+                                    placeholder="Enter your password"
                                 />
                             </Form.Group>
 
@@ -69,14 +79,21 @@ const Login = () => {
                                 disabled={loading}
                                 className="w-100"
                                 type="submit"
+                                style={{
+                                    backgroundColor: '#FF6500',
+                                    border: 'none',
+                                    padding: '0.75rem',
+                                    fontWeight: '600'
+                                }}
                             >
-                                {loading ? 'Logging in...' : 'Login'}
+                                {loading ? 'Signing in...' : 'Sign In'}
                             </Button>
                         </Form>
                     </Card.Body>
                 </Card>
-                <div className="w-100 text-center mt-2">
-                    Need an account? <Link to="/register">Sign Up</Link>
+                <div className="w-100 text-center mt-3">
+                    <span style={{ color: 'white' }}>Need an account? </span>
+                    <Link to="/register" style={{ color: '#FF6500', fontWeight: '600' }}>Sign Up</Link>
                 </div>
             </div>
         </Container>

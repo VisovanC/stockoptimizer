@@ -22,6 +22,22 @@ const PortfolioDetail = () => {
     const [training, setTraining] = useState(false);
     const [trainingProgress, setTrainingProgress] = useState(null);
 
+    // Safe number formatting functions
+    const formatCurrency = (value) => {
+        const numValue = parseFloat(value) || 0;
+        return numValue.toFixed(2);
+    };
+
+    const formatPercentage = (value) => {
+        const numValue = parseFloat(value) || 0;
+        return numValue.toFixed(2);
+    };
+
+    const formatNumber = (value, decimals = 2) => {
+        const numValue = parseFloat(value) || 0;
+        return numValue.toFixed(decimals);
+    };
+
     useEffect(() => {
         fetchPortfolioData();
         fetchMLStatus();
@@ -144,11 +160,11 @@ const PortfolioDetail = () => {
     const getStockChartData = () => {
         return portfolio.stocks.map(stock => ({
             name: stock.symbol,
-            value: stock.currentPrice * stock.shares
+            value: (parseFloat(stock.currentPrice) || 0) * (parseInt(stock.shares) || 0)
         }));
     };
 
-    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d', '#ffc658'];
+    const COLORS = ['#FF6500', '#1E3E62', '#0B192C', '#FF8642', '#2E5E92', '#82ca9d', '#ffc658'];
 
     if (loading) return <Container className="py-4">Loading portfolio...</Container>;
     if (!portfolio) return <Container className="py-4">Portfolio not found</Container>;
@@ -177,7 +193,7 @@ const PortfolioDetail = () => {
                                 Training ML Models...
                             </>
                         ) : (
-                            '🤖 Train ML Models'
+                            'Train ML Models'
                         )}
                     </Button>
                     <Button
@@ -230,7 +246,7 @@ const PortfolioDetail = () => {
                             onClick={fetchMLStatus}
                             disabled={training}
                         >
-                            🔄 Refresh
+                            Refresh
                         </Button>
                     </div>
                 </Card.Header>
@@ -245,7 +261,7 @@ const PortfolioDetail = () => {
                                 />
                                 {mlStatus.modelsReady === mlStatus.totalStocks && (
                                     <Alert variant="success" className="mt-2">
-                                        ✅ All models trained! AI recommendations are available.
+                                        All models trained! AI recommendations are available.
                                     </Alert>
                                 )}
                             </Col>
@@ -261,7 +277,7 @@ const PortfolioDetail = () => {
                                             'Not trained yet'
                                         }
                                     >
-                                        {symbol} {modelInfo.exists ? '✓' : '✗'}
+                                        {symbol} {modelInfo.exists ? '(Ready)' : '(Not trained)'}
                                     </Badge>
                                 ))}
                             </Col>
@@ -277,7 +293,7 @@ const PortfolioDetail = () => {
                     <Card>
                         <Card.Body>
                             <h6 className="text-muted">Total Value</h6>
-                            <h4>${(portfolio.totalValue || 0).toFixed(2)}</h4>
+                            <h4>${formatCurrency(portfolio.totalValue)}</h4>
                         </Card.Body>
                     </Card>
                 </Col>
@@ -285,8 +301,8 @@ const PortfolioDetail = () => {
                     <Card>
                         <Card.Body>
                             <h6 className="text-muted">Total Return</h6>
-                            <h4 className={portfolio.totalReturnPercentage >= 0 ? 'text-success' : 'text-danger'}>
-                                {portfolio.totalReturnPercentage?.toFixed(2)}%
+                            <h4 className={parseFloat(portfolio.totalReturnPercentage || 0) >= 0 ? 'text-success' : 'text-danger'}>
+                                {formatPercentage(portfolio.totalReturnPercentage)}%
                             </h4>
                         </Card.Body>
                     </Card>
@@ -295,10 +311,10 @@ const PortfolioDetail = () => {
                     <Card>
                         <Card.Body>
                             <h6 className="text-muted">Risk Score</h6>
-                            <h4>{portfolio.riskScore?.toFixed(1) || 'N/A'}</h4>
+                            <h4>{formatNumber(portfolio.riskScore, 1) || 'N/A'}</h4>
                             <ProgressBar
-                                now={portfolio.riskScore || 0}
-                                variant={portfolio.riskScore < 30 ? 'success' : portfolio.riskScore < 70 ? 'warning' : 'danger'}
+                                now={parseFloat(portfolio.riskScore) || 0}
+                                variant={parseFloat(portfolio.riskScore) < 30 ? 'success' : parseFloat(portfolio.riskScore) < 70 ? 'warning' : 'danger'}
                             />
                         </Card.Body>
                     </Card>
@@ -342,7 +358,7 @@ const PortfolioDetail = () => {
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip formatter={(value) => `$${value.toFixed(2)}`} />
+                                    <Tooltip formatter={(value) => `$${formatCurrency(value)}`} />
                                 </PieChart>
                             </ResponsiveContainer>
                         </Card.Body>
@@ -355,14 +371,14 @@ const PortfolioDetail = () => {
                             {suggestions && (
                                 <>
                                     <div className="mb-3">
-                                        <strong>Diversification Score:</strong> {suggestions.diversificationScore?.toFixed(1)}/100
-                                        <ProgressBar now={suggestions.diversificationScore} variant="info" className="mt-1" />
+                                        <strong>Diversification Score:</strong> {formatNumber(suggestions.diversificationScore, 1)}/100
+                                        <ProgressBar now={parseFloat(suggestions.diversificationScore) || 0} variant="info" className="mt-1" />
                                     </div>
                                     <div className="mb-3">
-                                        <strong>Risk Score:</strong> {suggestions.riskScore?.toFixed(1)}/100
+                                        <strong>Risk Score:</strong> {formatNumber(suggestions.riskScore, 1)}/100
                                         <ProgressBar
-                                            now={suggestions.riskScore}
-                                            variant={suggestions.riskScore < 30 ? 'success' : suggestions.riskScore < 70 ? 'warning' : 'danger'}
+                                            now={parseFloat(suggestions.riskScore) || 0}
+                                            variant={parseFloat(suggestions.riskScore) < 30 ? 'success' : parseFloat(suggestions.riskScore) < 70 ? 'warning' : 'danger'}
                                             className="mt-1"
                                         />
                                     </div>
@@ -398,16 +414,17 @@ const PortfolioDetail = () => {
                         <tbody>
                         {portfolio.stocks.map((stock, index) => {
                             const suggestion = suggestions?.stocks?.find(s => s.symbol === stock.symbol);
+                            const returnPercentage = parseFloat(stock.returnPercentage) || 0;
                             return (
                                 <tr key={index}>
                                     <td><strong>{stock.symbol}</strong></td>
                                     <td>{stock.companyName}</td>
                                     <td>{stock.shares}</td>
-                                    <td>${stock.entryPrice.toFixed(2)}</td>
-                                    <td>${stock.currentPrice?.toFixed(2) || 'N/A'}</td>
-                                    <td>{stock.weight?.toFixed(1)}%</td>
-                                    <td className={stock.returnPercentage >= 0 ? 'text-success' : 'text-danger'}>
-                                        {stock.returnPercentage?.toFixed(2)}%
+                                    <td>${formatCurrency(stock.entryPrice)}</td>
+                                    <td>${formatCurrency(stock.currentPrice) || 'N/A'}</td>
+                                    <td>{formatNumber(stock.weight, 1)}%</td>
+                                    <td className={returnPercentage >= 0 ? 'text-success' : 'text-danger'}>
+                                        {formatPercentage(stock.returnPercentage)}%
                                     </td>
                                     <td>
                                         {suggestion && (
@@ -431,7 +448,7 @@ const PortfolioDetail = () => {
             {/* AI Recommendations Modal */}
             <Modal show={showAIModal} onHide={() => setShowAIModal(false)} size="lg">
                 <Modal.Header closeButton>
-                    <Modal.Title>🤖 AI Portfolio Recommendations</Modal.Title>
+                    <Modal.Title>AI Portfolio Recommendations</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     {/* Risk Tolerance Slider */}
@@ -465,7 +482,7 @@ const PortfolioDetail = () => {
                     {aiRecommendations && (
                         <>
                             <Alert variant="info">
-                                <strong>AI Confidence Score:</strong> {aiRecommendations.aiConfidenceScore?.toFixed(1)}%
+                                <strong>AI Confidence Score:</strong> {formatNumber(aiRecommendations.aiConfidenceScore, 1)}%
                             </Alert>
 
                             <h5>Recommended Allocations</h5>
@@ -481,15 +498,16 @@ const PortfolioDetail = () => {
                                 <tbody>
                                 {Object.entries(aiRecommendations.recommendedAllocations).map(([symbol, allocation]) => {
                                     const currentStock = portfolio.stocks.find(s => s.symbol === symbol);
-                                    const currentWeight = currentStock?.weight || 0;
-                                    const change = (allocation * 100) - currentWeight;
+                                    const currentWeight = parseFloat(currentStock?.weight) || 0;
+                                    const recommendedWeight = parseFloat(allocation) * 100;
+                                    const change = recommendedWeight - currentWeight;
                                     return (
                                         <tr key={symbol}>
                                             <td>{symbol}</td>
-                                            <td>{currentWeight.toFixed(1)}%</td>
-                                            <td>{(allocation * 100).toFixed(1)}%</td>
+                                            <td>{formatNumber(currentWeight, 1)}%</td>
+                                            <td>{formatNumber(recommendedWeight, 1)}%</td>
                                             <td className={change >= 0 ? 'text-success' : 'text-danger'}>
-                                                {change >= 0 ? '+' : ''}{change.toFixed(1)}%
+                                                {change >= 0 ? '+' : ''}{formatNumber(change, 1)}%
                                             </td>
                                         </tr>
                                     );
@@ -504,7 +522,7 @@ const PortfolioDetail = () => {
                                         <Card.Body className="text-center">
                                             <h6>Expected Return</h6>
                                             <h4 className="text-success">
-                                                {aiRecommendations.expectedPerformance?.expectedAnnualReturn?.toFixed(2)}%
+                                                {formatPercentage(aiRecommendations.expectedPerformance?.expectedAnnualReturn)}%
                                             </h4>
                                         </Card.Body>
                                     </Card>
@@ -513,7 +531,7 @@ const PortfolioDetail = () => {
                                     <Card>
                                         <Card.Body className="text-center">
                                             <h6>Expected Volatility</h6>
-                                            <h4>{aiRecommendations.expectedPerformance?.expectedAnnualVolatility?.toFixed(2)}%</h4>
+                                            <h4>{formatPercentage(aiRecommendations.expectedPerformance?.expectedAnnualVolatility)}%</h4>
                                         </Card.Body>
                                     </Card>
                                 </Col>
@@ -521,7 +539,7 @@ const PortfolioDetail = () => {
                                     <Card>
                                         <Card.Body className="text-center">
                                             <h6>Sharpe Ratio</h6>
-                                            <h4>{aiRecommendations.expectedPerformance?.sharpeRatio?.toFixed(2)}</h4>
+                                            <h4>{formatNumber(aiRecommendations.expectedPerformance?.sharpeRatio)}</h4>
                                         </Card.Body>
                                     </Card>
                                 </Col>
