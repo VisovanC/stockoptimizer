@@ -19,10 +19,10 @@ import java.util.stream.Collectors;
 public class MarketDataCollectorService {
 
     private final StockDataRepository stockDataRepository;
-    private static final int MAX_RETRIES = 2; // Reduced retries
-    private static final long INITIAL_DELAY_MS = 5000; // Increased initial delay
-    private static final long MAX_DELAY_MS = 30000;
-    private static final boolean PREFER_SAMPLE_DATA = true; // Always prefer sample data
+    private static final int MAX_RETRIES = 3;
+    private static final long INITIAL_DELAY_MS = 2000;
+    private static final long MAX_DELAY_MS = 10000;
+    private static final boolean PREFER_REAL_DATA = true; // Changed to prefer real data
 
     @Autowired
     public MarketDataCollectorService(StockDataRepository stockDataRepository) {
@@ -44,23 +44,36 @@ public class MarketDataCollectorService {
         }
 
         // Delete any partial data to avoid duplicates
-        if (existingData.size() > 0) {
+        if (!existingData.isEmpty()) {
             System.out.println("Deleting " + existingData.size() + " partial data points for " + symbol);
             stockDataRepository.deleteByUserIdAndSymbolAndDateBetween(userId, symbol, from, to);
         }
 
-        // If PREFER_SAMPLE_DATA is true or we don't have enough data, generate sample data
-        if (PREFER_SAMPLE_DATA || existingData.size() < 100) {
-            System.out.println("Generating sample data for " + symbol + " to ensure ML model has enough data");
-            List<StockData> sampleData = generateSampleData(symbol, from, to, userId);
-
-            // Save the sample data
-            stockDataRepository.saveAll(sampleData);
-            return sampleData;
+        // Try Yahoo Finance first if we prefer real data
+        if (PREFER_REAL_DATA) {
+            try {
+                List<StockData> yahooData = fetchFromYahooFinance(symbol, from, to, userId);
+                if (!yahooData.isEmpty()) {
+                    // Save the data
+                    stockDataRepository.saveAll(yahooData);
+                    return yahooData;
+                }
+            } catch (Exception e) {
+                System.err.println("Yahoo Finance failed for " + symbol + ": " + e.getMessage());
+                // Fall back to sample data
+            }
         }
 
-        // Try Yahoo Finance (this code path is rarely reached due to PREFER_SAMPLE_DATA)
+        // Use sample data as fallback
+        System.out.println("Using sample data for " + symbol);
+        List<StockData> sampleData = generateSampleData(symbol, from, to, userId);
+        stockDataRepository.saveAll(sampleData);
+        return sampleData;
+    }
+
+    private List<StockData> fetchFromYahooFinance(String symbol, LocalDate from, LocalDate to, String userId) throws IOException, InterruptedException {
         IOException lastException = null;
+
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             try {
                 if (attempt > 1) {
@@ -69,7 +82,7 @@ public class MarketDataCollectorService {
                     Thread.sleep(delay);
                 }
 
-                System.out.println("Attempting to fetch from Yahoo Finance for " + symbol + " (attempt " + attempt + ")");
+                System.out.println("Fetching from Yahoo Finance for " + symbol + " (attempt " + attempt + ")");
 
                 Calendar fromDate = Calendar.getInstance();
                 fromDate.setTime(java.sql.Date.valueOf(from));
@@ -80,7 +93,7 @@ public class MarketDataCollectorService {
                 yahoofinance.Stock stock = YahooFinance.get(symbol, fromDate, toDate, Interval.DAILY);
 
                 if (stock == null || stock.getHistory() == null || stock.getHistory().isEmpty()) {
-                    throw new IOException("No data returned from Yahoo Finance");
+                    throw new IOException("No data returned from Yahoo Finance for " + symbol);
                 }
 
                 List<HistoricalQuote> quotes = stock.getHistory();
@@ -102,20 +115,16 @@ public class MarketDataCollectorService {
                         })
                         .collect(Collectors.toList());
 
-                System.out.println("Successfully fetched " + stockDataList.size() + " data points from Yahoo Finance");
+                System.out.println("Successfully fetched " + stockDataList.size() + " data points from Yahoo Finance for " + symbol);
                 return stockDataList;
 
             } catch (IOException | InterruptedException e) {
                 lastException = new IOException(e.getMessage());
-                System.err.println("Yahoo Finance error: " + e.getMessage());
+                System.err.println("Yahoo Finance error (attempt " + attempt + "): " + e.getMessage());
             }
         }
 
-        // If Yahoo Finance fails, always fall back to sample data
-        System.out.println("Yahoo Finance failed after " + MAX_RETRIES + " attempts. Using sample data for " + symbol);
-        List<StockData> sampleData = generateSampleData(symbol, from, to, userId);
-        // No need to save here, just return the data
-        return sampleData;
+        throw lastException != null ? lastException : new IOException("Failed to fetch data from Yahoo Finance");
     }
 
     public Map<String, List<StockData>> fetchHistoricalDataBatch(List<String> symbols, LocalDate from, LocalDate to, String userId) throws IOException {
@@ -125,9 +134,12 @@ public class MarketDataCollectorService {
             try {
                 List<StockData> data = fetchHistoricalData(symbol, from, to, userId);
                 result.put(symbol, data);
-            } catch (IOException e) {
+
+                // Add delay between symbols to avoid rate limiting
+                Thread.sleep(1000);
+            } catch (Exception e) {
                 System.err.println("Error fetching data for " + symbol + ": " + e.getMessage());
-                // Always use sample data on error
+                // Use sample data on error
                 List<StockData> sampleData = generateSampleData(symbol, from, to, userId);
                 stockDataRepository.saveAll(sampleData);
                 result.put(symbol, sampleData);
@@ -147,24 +159,29 @@ public class MarketDataCollectorService {
         List<StockData> sampleData = new ArrayList<>();
         LocalDate currentDate = from;
 
-        // Base prices for common stocks
+        // Base prices for common stocks (updated to be more realistic)
         Map<String, Double> basePrices = new HashMap<>();
-        basePrices.put("AAPL", 150.0);
-        basePrices.put("MSFT", 300.0);
-        basePrices.put("GOOGL", 2500.0);
-        basePrices.put("AMZN", 3000.0);
-        basePrices.put("TSLA", 800.0);
-        basePrices.put("META", 200.0);
-        basePrices.put("NVDA", 400.0);
-        basePrices.put("JPM", 140.0);
-        basePrices.put("JNJ", 160.0);
-        basePrices.put("V", 220.0);
+        basePrices.put("AAPL", 180.0);
+        basePrices.put("MSFT", 380.0);
+        basePrices.put("GOOGL", 140.0);
+        basePrices.put("AMZN", 170.0);
+        basePrices.put("TSLA", 250.0);
+        basePrices.put("META", 500.0);
+        basePrices.put("NVDA", 850.0);
+        basePrices.put("JPM", 180.0);
+        basePrices.put("JNJ", 155.0);
+        basePrices.put("V", 280.0);
+        basePrices.put("WMT", 180.0);
+        basePrices.put("PG", 165.0);
+        basePrices.put("UNH", 530.0);
+        basePrices.put("HD", 370.0);
+        basePrices.put("MA", 460.0);
 
-        double basePrice = basePrices.getOrDefault(symbol, 100.0);
+        double basePrice = basePrices.getOrDefault(symbol.toUpperCase(), 100.0);
         Random random = new Random(symbol.hashCode() + userId.hashCode());
 
-        // Add some trend to make it more realistic
-        double trendFactor = 1.0 + (random.nextDouble() - 0.3) * 0.2; // -10% to +20% overall trend
+        // Add realistic market trends
+        double trendFactor = 1.0 + (random.nextDouble() - 0.4) * 0.3; // -10% to +20% overall trend
 
         while (!currentDate.isAfter(to)) {
             // Skip weekends
@@ -208,7 +225,7 @@ public class MarketDataCollectorService {
     public void saveStockDataForUser(List<StockData> stockDataList, String userId, String symbol) {
         if (stockDataList.isEmpty()) return;
 
-        // Delete existing data for this user and symbol
+        // Delete existing data for this user and symbol to avoid duplicates
         stockDataRepository.deleteByUserIdAndSymbol(userId, symbol);
 
         // Save new data
@@ -228,10 +245,8 @@ public class MarketDataCollectorService {
 
         for (String symbol : symbols) {
             try {
-                // Always use sample data for initial collection
-                List<StockData> data = generateSampleData(symbol, startDate, endDate, userId);
-                stockDataRepository.saveAll(data);
-                System.out.println("Saved " + data.size() + " records for " + symbol);
+                List<StockData> data = fetchHistoricalData(symbol, startDate, endDate, userId);
+                System.out.println("Collected " + data.size() + " records for " + symbol);
             } catch (Exception e) {
                 System.err.println("Failed to collect data for " + symbol + ": " + e.getMessage());
             }
@@ -257,11 +272,9 @@ public class MarketDataCollectorService {
 
         for (String symbol : symbols) {
             try {
-                // For daily updates, just generate one day of sample data
-                List<StockData> latestData = generateSampleData(symbol, yesterday, today, systemUserId);
-                if (!latestData.isEmpty()) {
-                    stockDataRepository.saveAll(latestData);
-                }
+                // For daily updates, try to get real data first
+                List<StockData> latestData = fetchHistoricalData(symbol, yesterday, today, systemUserId);
+                System.out.println("Updated " + symbol + " with " + latestData.size() + " new data points");
             } catch (Exception e) {
                 System.err.println("Error updating data for " + symbol + ": " + e.getMessage());
             }

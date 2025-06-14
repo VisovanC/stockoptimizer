@@ -3,7 +3,11 @@ package com.cv.stockoptimizer.controller;
 import com.cv.stockoptimizer.model.dto.request.PortfolioRequest;
 import com.cv.stockoptimizer.model.dto.request.StockRequest;
 import com.cv.stockoptimizer.model.entity.Portfolio;
+import com.cv.stockoptimizer.model.entity.StockData;
 import com.cv.stockoptimizer.repository.PortfolioRepository;
+import com.cv.stockoptimizer.repository.StockDataRepository;
+import com.cv.stockoptimizer.service.data.MarketDataCollectorService;
+import com.cv.stockoptimizer.service.data.TechnicalIndicatorService;
 import com.cv.stockoptimizer.service.optimization.PortfolioOptimizationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -12,11 +16,16 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/portfolios")
@@ -24,11 +33,22 @@ public class PortfolioController {
 
     private final PortfolioRepository portfolioRepository;
     private final PortfolioOptimizationService optimizationService;
+    private final MarketDataCollectorService marketDataCollectorService;
+    private final TechnicalIndicatorService technicalIndicatorService;
+    private final StockDataRepository stockDataRepository;
 
     @Autowired
-    public PortfolioController(PortfolioRepository portfolioRepository, PortfolioOptimizationService optimizationService) {
+    public PortfolioController(
+            PortfolioRepository portfolioRepository,
+            PortfolioOptimizationService optimizationService,
+            MarketDataCollectorService marketDataCollectorService,
+            TechnicalIndicatorService technicalIndicatorService,
+            StockDataRepository stockDataRepository) {
         this.portfolioRepository = portfolioRepository;
         this.optimizationService = optimizationService;
+        this.marketDataCollectorService = marketDataCollectorService;
+        this.technicalIndicatorService = technicalIndicatorService;
+        this.stockDataRepository = stockDataRepository;
     }
 
     @GetMapping
@@ -69,9 +89,19 @@ public class PortfolioController {
         List<Portfolio.PortfolioStock> stocks = new ArrayList<>();
 
         if (portfolioRequest.getStocks() != null) {
+            // Collect unique symbols to check for data
+            Set<String> uniqueSymbols = new HashSet<>();
+            for (StockRequest stockRequest : portfolioRequest.getStocks()) {
+                uniqueSymbols.add(stockRequest.getSymbol().toUpperCase());
+            }
+
+            // Ensure we have data for all symbols
+            ensureStockDataExists(uniqueSymbols, currentUserId);
+
+            // Create portfolio stocks
             for (StockRequest stockRequest : portfolioRequest.getStocks()) {
                 Portfolio.PortfolioStock stock = new Portfolio.PortfolioStock();
-                stock.setSymbol(stockRequest.getSymbol());
+                stock.setSymbol(stockRequest.getSymbol().toUpperCase());
                 stock.setCompanyName(stockRequest.getCompanyName());
                 stock.setShares(stockRequest.getShares());
                 stock.setEntryPrice(stockRequest.getEntryPrice());
@@ -105,9 +135,18 @@ public class PortfolioController {
         if (portfolioRequest.getStocks() != null) {
             List<Portfolio.PortfolioStock> stocks = new ArrayList<>();
 
+            // Collect unique symbols to check for data
+            Set<String> uniqueSymbols = new HashSet<>();
+            for (StockRequest stockRequest : portfolioRequest.getStocks()) {
+                uniqueSymbols.add(stockRequest.getSymbol().toUpperCase());
+            }
+
+            // Ensure we have data for all symbols
+            ensureStockDataExists(uniqueSymbols, currentUserId);
+
             for (StockRequest stockRequest : portfolioRequest.getStocks()) {
                 Portfolio.PortfolioStock stock = new Portfolio.PortfolioStock();
-                stock.setSymbol(stockRequest.getSymbol());
+                stock.setSymbol(stockRequest.getSymbol().toUpperCase());
                 stock.setCompanyName(stockRequest.getCompanyName());
                 stock.setShares(stockRequest.getShares());
                 stock.setEntryPrice(stockRequest.getEntryPrice());
@@ -202,5 +241,62 @@ public class PortfolioController {
     private String getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getName();
+    }
+
+    /**
+     * Ensure stock data exists for all symbols in the portfolio
+     * If data doesn't exist, try to fetch from Yahoo Finance or generate sample data
+     */
+    private void ensureStockDataExists(Set<String> symbols, String userId) {
+        LocalDate endDate = LocalDate.now();
+        LocalDate startDate = endDate.minusYears(2);
+
+        for (String symbol : symbols) {
+            // Check if we have data for this symbol
+            List<StockData> existingData = stockDataRepository
+                    .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, symbol, startDate, endDate);
+
+            if (existingData.size() < 100) { // Need at least 100 data points
+                System.out.println("Insufficient data for " + symbol + ", fetching/generating data...");
+
+                // Run data collection asynchronously to avoid blocking the request
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        // First try Yahoo Finance
+                        List<StockData> historicalData = marketDataCollectorService
+                                .fetchHistoricalData(symbol, startDate, endDate, userId);
+
+                        if (historicalData.isEmpty() || historicalData.size() < 100) {
+                            // Fall back to sample data
+                            System.out.println("Yahoo Finance failed or insufficient data for " + symbol +
+                                    ", generating sample data...");
+                            historicalData = marketDataCollectorService
+                                    .generateSampleData(symbol, startDate, endDate, userId);
+                        }
+
+                        // Save the data
+                        stockDataRepository.saveAll(historicalData);
+                        System.out.println("Saved " + historicalData.size() + " data points for " + symbol);
+
+                        // Calculate technical indicators
+                        technicalIndicatorService.calculateAllIndicators(symbol, startDate, endDate, userId);
+                        System.out.println("Calculated technical indicators for " + symbol);
+
+                    } catch (Exception e) {
+                        System.err.println("Error ensuring data for " + symbol + ": " + e.getMessage());
+                        // Generate sample data as last resort
+                        try {
+                            List<StockData> sampleData = marketDataCollectorService
+                                    .generateSampleData(symbol, startDate, endDate, userId);
+                            stockDataRepository.saveAll(sampleData);
+                            technicalIndicatorService.calculateAllIndicators(symbol, startDate, endDate, userId);
+                            System.out.println("Generated sample data for " + symbol + " after error");
+                        } catch (Exception ex) {
+                            System.err.println("Failed to generate sample data for " + symbol + ": " + ex.getMessage());
+                        }
+                    }
+                });
+            }
+        }
     }
 }

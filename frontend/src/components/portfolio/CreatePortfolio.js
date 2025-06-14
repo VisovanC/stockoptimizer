@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Container, Card, Form, Button, Table, Row, Col, Alert } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
+import { Container, Card, Form, Button, Table, Row, Col, Alert, InputGroup, ListGroup } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import portfolioService from '../../services/portfolio.service';
 import { toast } from 'react-toastify';
@@ -19,6 +19,18 @@ const CreatePortfolio = () => {
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [searchResults, setSearchResults] = useState([]);
+    const [searching, setSearching] = useState(false);
+    const [showSearchResults, setShowSearchResults] = useState(false);
+
+    useEffect(() => {
+        // Hide search results when clicking outside
+        const handleClickOutside = () => {
+            setShowSearchResults(false);
+        };
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, []);
 
     const handlePortfolioChange = (e) => {
         setPortfolioData({
@@ -28,24 +40,99 @@ const CreatePortfolio = () => {
     };
 
     const handleStockChange = (e) => {
+        const { name, value } = e.target;
+
         setCurrentStock({
             ...currentStock,
-            [e.target.name]: e.target.value
+            [name]: value
         });
+
+        // Search for stocks when typing symbol
+        if (name === 'symbol' && value.length > 0) {
+            setSearching(true);
+            setShowSearchResults(true);
+            searchStocks(value);
+        } else if (name === 'symbol' && value.length === 0) {
+            setSearchResults([]);
+            setShowSearchResults(false);
+        }
     };
 
-    const addStock = () => {
+    const searchStocks = async (query) => {
+        try {
+            const results = await portfolioService.searchStocks(query);
+            setSearchResults(results.slice(0, 10)); // Limit to 10 results
+        } catch (error) {
+            console.error('Error searching stocks:', error);
+            setSearchResults([]);
+        } finally {
+            setSearching(false);
+        }
+    };
+
+    const selectStock = (stock) => {
+        setCurrentStock({
+            ...currentStock,
+            symbol: stock.symbol,
+            companyName: stock.name
+        });
+        setSearchResults([]);
+        setShowSearchResults(false);
+    };
+
+    const validateStock = async () => {
+        if (!currentStock.symbol) {
+            setError('Please enter a stock symbol');
+            return false;
+        }
+
+        // Try to validate the symbol
+        try {
+            const validation = await portfolioService.validateSymbol(currentStock.symbol);
+            if (!validation.valid) {
+                setError(`Invalid stock symbol: ${currentStock.symbol}`);
+                return false;
+            }
+
+            // Set company name if not already set
+            if (!currentStock.companyName && validation.name) {
+                setCurrentStock({
+                    ...currentStock,
+                    companyName: validation.name
+                });
+            }
+
+            return true;
+        } catch (error) {
+            // Allow the symbol anyway - data will be fetched when needed
+            return true;
+        }
+    };
+
+    const addStock = async () => {
         if (!currentStock.symbol || !currentStock.shares || !currentStock.entryPrice) {
             setError('Please fill in all stock fields');
             return;
         }
 
+        // Validate the stock symbol
+        const isValid = await validateStock();
+        if (!isValid) {
+            return;
+        }
+
         const newStock = {
             symbol: currentStock.symbol.toUpperCase(),
-            companyName: currentStock.companyName,
+            companyName: currentStock.companyName || currentStock.symbol.toUpperCase() + ' Corp.',
             shares: parseInt(currentStock.shares),
             entryPrice: parseFloat(currentStock.entryPrice)
         };
+
+        // Check if stock already exists in portfolio
+        if (portfolioData.stocks.some(s => s.symbol === newStock.symbol)) {
+            setError('Stock already exists in portfolio');
+            return;
+        }
 
         setPortfolioData({
             ...portfolioData,
@@ -60,6 +147,8 @@ const CreatePortfolio = () => {
             entryPrice: ''
         });
         setError('');
+
+        toast.success(`Added ${newStock.symbol} to portfolio`);
     };
 
     const removeStock = (index) => {
@@ -85,6 +174,14 @@ const CreatePortfolio = () => {
 
         setLoading(true);
         try {
+            // Ensure data exists for all stocks
+            const dataCollectionPromises = portfolioData.stocks.map(stock =>
+                portfolioService.ensureStockData(stock.symbol)
+            );
+
+            await Promise.all(dataCollectionPromises);
+
+            // Create the portfolio
             await portfolioService.createPortfolio(portfolioData);
             toast.success('Portfolio created successfully!');
             navigate('/portfolios');
@@ -146,7 +243,7 @@ const CreatePortfolio = () => {
                             <Form>
                                 <Row>
                                     <Col md={3}>
-                                        <Form.Group className="mb-3">
+                                        <Form.Group className="mb-3 position-relative">
                                             <Form.Label>Symbol *</Form.Label>
                                             <Form.Control
                                                 type="text"
@@ -155,7 +252,32 @@ const CreatePortfolio = () => {
                                                 onChange={handleStockChange}
                                                 placeholder="AAPL"
                                                 style={{ textTransform: 'uppercase' }}
+                                                onClick={(e) => e.stopPropagation()}
                                             />
+                                            {showSearchResults && searchResults.length > 0 && (
+                                                <ListGroup
+                                                    className="position-absolute w-100"
+                                                    style={{
+                                                        top: '100%',
+                                                        zIndex: 1000,
+                                                        maxHeight: '200px',
+                                                        overflowY: 'auto',
+                                                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    {searchResults.map((result, idx) => (
+                                                        <ListGroup.Item
+                                                            key={idx}
+                                                            action
+                                                            onClick={() => selectStock(result)}
+                                                            style={{ cursor: 'pointer' }}
+                                                        >
+                                                            <strong>{result.symbol}</strong> - {result.name}
+                                                        </ListGroup.Item>
+                                                    ))}
+                                                </ListGroup>
+                                            )}
                                         </Form.Group>
                                     </Col>
                                     <Col md={3}>
@@ -201,6 +323,9 @@ const CreatePortfolio = () => {
                                 <Button variant="success" onClick={addStock}>
                                     Add Stock
                                 </Button>
+                                <small className="text-muted ms-3">
+                                    You can add any stock symbol traded on major exchanges
+                                </small>
                             </Form>
                         </Card.Body>
                     </Card>
@@ -286,9 +411,10 @@ const CreatePortfolio = () => {
                         <Card.Body>
                             <h6>Quick Tips:</h6>
                             <ul className="small">
-                                <li>Enter stock symbols in uppercase (e.g., AAPL, MSFT)</li>
-                                <li>You can add multiple stocks to diversify your portfolio</li>
-                                <li>Entry price is the price at which you bought the stock</li>
+                                <li>You can add any stock symbol from major exchanges</li>
+                                <li>Stock data will be automatically fetched</li>
+                                <li>If Yahoo Finance is unavailable, sample data will be used</li>
+                                <li>Start typing a symbol to search for stocks</li>
                                 <li>You can upload an Excel file instead if you have many stocks</li>
                             </ul>
                         </Card.Body>

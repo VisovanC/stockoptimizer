@@ -105,30 +105,35 @@ public class PortfolioMLService {
                 progress.setCurrentStock(symbol);
                 logger.info("Processing stock {} for portfolio {}", symbol, portfolioId);
 
-                // Step 1: Collect historical data
-                progress.setCurrentStep("Collecting data for " + symbol);
-                List<StockData> historicalData;
+                // Step 1: Check if we already have sufficient data
+                List<StockData> existingData = stockDataRepository
+                        .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, symbol, startDate, endDate);
 
-                if (useSampleData) {
-                    historicalData = dataCollectorService.generateSampleData(symbol, startDate, endDate, userId);
-                } else {
+                if (existingData.size() < 100) {
+                    // Need to collect more data
+                    progress.setCurrentStep("Collecting data for " + symbol);
+                    List<StockData> historicalData;
+
                     try {
+                        // Try to fetch data (will automatically handle duplicates)
                         historicalData = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate, userId);
+                        logger.info("Collected/verified {} data points for {}", historicalData.size(), symbol);
                     } catch (Exception e) {
-                        logger.warn("Yahoo Finance failed for {}, using sample data", symbol);
-                        historicalData = dataCollectorService.generateSampleData(symbol, startDate, endDate, userId);
+                        logger.warn("Data collection failed for {}, using existing data", symbol);
+                        historicalData = existingData;
                     }
-                }
-
-                if (!historicalData.isEmpty()) {
-                    stockDataRepository.saveAll(historicalData);
-                    logger.info("Saved {} data points for {}", historicalData.size(), symbol);
+                } else {
+                    logger.info("Using existing {} data points for {}", existingData.size(), symbol);
                 }
 
                 // Step 2: Calculate technical indicators
                 progress.setCurrentStep("Calculating indicators for " + symbol);
-                List<?> indicators = indicatorService.calculateAllIndicators(symbol, startDate, endDate, userId);
-                logger.info("Calculated {} indicators for {}", indicators.size(), symbol);
+                try {
+                    List<?> indicators = indicatorService.calculateAllIndicators(symbol, startDate, endDate, userId);
+                    logger.info("Calculated {} indicators for {}", indicators.size(), symbol);
+                } catch (Exception e) {
+                    logger.warn("Error calculating indicators for {}: {}", symbol, e.getMessage());
+                }
 
                 // Step 3: Train neural network model
                 progress.setCurrentStep("Training model for " + symbol);
