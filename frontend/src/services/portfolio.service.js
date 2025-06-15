@@ -13,7 +13,6 @@ const portfolioService = {
   },
 
   createPortfolio: async (portfolioData) => {
-    // Pre-process stocks to ensure they're uppercase and valid
     if (portfolioData.stocks) {
       portfolioData.stocks = portfolioData.stocks.map(stock => ({
         ...stock,
@@ -26,7 +25,6 @@ const portfolioService = {
   },
 
   updatePortfolio: async (id, portfolioData) => {
-    // Pre-process stocks to ensure they're uppercase
     if (portfolioData.stocks) {
       portfolioData.stocks = portfolioData.stocks.map(stock => ({
         ...stock,
@@ -42,8 +40,6 @@ const portfolioService = {
     const response = await api.delete(`/portfolios/${id}`);
     return response.data;
   },
-
-  // Validate a stock symbol
   validateSymbol: async (symbol) => {
     try {
       const response = await api.get(`/stocks/validate/${symbol}`);
@@ -57,7 +53,6 @@ const portfolioService = {
     }
   },
 
-  // Search for stocks
   searchStocks: async (query) => {
     try {
       const response = await api.get(`/stocks/search?query=${query}`);
@@ -67,10 +62,8 @@ const portfolioService = {
     }
   },
 
-  // Ensure stock data exists before adding to portfolio
   ensureStockData: async (symbol) => {
     try {
-      // Try to collect data for the stock
       const response = await api.post(`/stocks/data/collect/${symbol}`, null, {
         params: { days: 365, forceRefresh: false }
       });
@@ -101,10 +94,9 @@ const portfolioService = {
           }
 
           const portfolioData = {
-            name: file.name.replace(/\.[^/.]+$/, ''), // Remove file extension
+            name: file.name.replace(/\.[^/.]+$/, ''),
             description: `Imported from ${file.name}`,
             stocks: jsonData.map(row => {
-              // Try different column name variations
               const symbol = (row['Symbol'] || row['Ticker'] || row['Stock'] || row['SYMBOL'] || row['symbol'] || '').toString().toUpperCase();
               const companyName = row['Company Name'] || row['Name'] || row['Company'] || row['COMPANY NAME'] || row['name'] || '';
               const shares = parseInt(row['Shares'] || row['Quantity'] || row['QTY'] || row['shares'] || row['SHARES'] || 0);
@@ -167,7 +159,6 @@ const portfolioService = {
       const response = await api.get(`/ml/portfolio/${portfolioId}/status`);
       return response.data;
     } catch (error) {
-      // If the endpoint doesn't exist, try the controller pattern
       const response = await api.get(`/portfolio/${portfolioId}/ml/status`);
       return response.data;
     }
@@ -180,7 +171,6 @@ const portfolioService = {
       });
       return response.data;
     } catch (error) {
-      // If the endpoint doesn't exist, try the controller pattern
       const response = await api.post(`/portfolio/${portfolioId}/ml/train`, null, {
         params: { useSampleData }
       });
@@ -195,7 +185,6 @@ const portfolioService = {
       });
       return response.data;
     } catch (error) {
-      // If the endpoint doesn't exist, use the AI portfolio upgrader
       const response = await api.get(`/ai/portfolio/${portfolioId}/upgrade-recommendations`, {
         params: { riskTolerance, expandUniverse }
       });
@@ -217,29 +206,21 @@ const portfolioService = {
     const response = await api.get(`/portfolio-history/portfolio/${portfolioId}/ai-recommendations`);
     return response.data;
   },
-
-  // New methods for handling any stock symbol
   addStockToPortfolio: async (portfolioId, stockData) => {
-    // Ensure symbol is uppercase
     stockData.symbol = stockData.symbol.toUpperCase();
 
-    // First, ensure we have data for this stock
     await portfolioService.ensureStockData(stockData.symbol);
 
-    // Get the current portfolio
     const portfolio = await portfolioService.getPortfolio(portfolioId);
 
-    // Add the new stock
     const updatedStocks = [...portfolio.stocks, stockData];
 
-    // Update the portfolio
     return portfolioService.updatePortfolio(portfolioId, {
       ...portfolio,
       stocks: updatedStocks
     });
   },
 
-  // Batch collect data for multiple stocks
   collectDataForStocks: async (symbols) => {
     const results = [];
 

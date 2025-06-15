@@ -26,7 +26,7 @@ public class StockController {
         if (authentication != null && authentication.isAuthenticated()) {
             return authentication.getName();
         }
-        return "system"; // Default user
+        return "system";
     }
 
     private final StockDataRepository stockDataRepository;
@@ -68,7 +68,6 @@ public class StockController {
         LocalDate fromDate = from != null ? LocalDate.parse(from) : LocalDate.now().minusMonths(3);
         LocalDate toDate = to != null ? LocalDate.parse(to) : LocalDate.now();
 
-        // Use userId in the query
         List<StockData> data = stockDataRepository.findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(
                 userId, symbol.toUpperCase(), fromDate, toDate);
 
@@ -113,12 +112,11 @@ public class StockController {
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusDays(days);
 
-            // Check if we already have recent data
             if (!forceRefresh) {
                 List<StockData> existingData = stockDataRepository
                         .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, symbol, startDate, endDate);
 
-                if (existingData.size() >= days * 0.7) { // If we have 70% of expected data
+                if (existingData.size() >= days * 0.7) {
                     Map<String, Object> response = new HashMap<>();
                     response.put("symbol", symbol);
                     response.put("dataPoints", existingData.size());
@@ -128,8 +126,6 @@ public class StockController {
                     return ResponseEntity.ok(response);
                 }
             }
-
-            // Fetch new data
             List<StockData> data = dataCollectorService.fetchHistoricalData(
                     symbol, startDate, endDate, userId);
 
@@ -160,7 +156,6 @@ public class StockController {
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusYears(2);
 
-            // Pass userId to the service
             List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(
                     symbol, startDate, endDate, userId);
 
@@ -216,27 +211,22 @@ public class StockController {
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusYears(2);
 
-            // Check if data exists
             List<StockData> data = stockDataRepository.findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(
                     userId, symbol, startDate, endDate);
 
             if (data.size() < 100) {
-                // Collect data first
                 data = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate, userId);
             }
 
-            // Calculate indicators if needed
             List<TechnicalIndicator> indicators = indicatorService.calculateAllIndicators(
                     symbol, startDate, endDate, userId);
 
-            // Generate predictions
             List<StockPrediction> predictions = neuralNetworkService.predictFuturePrices(symbol, userId);
             StockPrediction prediction = predictions.get(0);
 
             Map<String, Object> analysis = new HashMap<>();
             analysis.put("symbol", symbol);
 
-            // Basic info
             String trend = "NEUTRAL";
             String rsiSignal = "NEUTRAL";
             String macdSignal = "NEUTRAL";
@@ -251,7 +241,6 @@ public class StockController {
 
                 Map<String, Object> technicalAnalysis = new HashMap<>();
 
-                // Trend analysis
                 if (latestIndicator.getSma20() > latestIndicator.getSma50()) {
                     trend = "BULLISH";
                 } else if (latestIndicator.getSma20() < latestIndicator.getSma50()) {
@@ -259,7 +248,6 @@ public class StockController {
                 }
                 technicalAnalysis.put("trend", trend);
 
-                // RSI analysis
                 if (latestIndicator.getRsi14() > 70) {
                     rsiSignal = "OVERBOUGHT";
                 } else if (latestIndicator.getRsi14() < 30) {
@@ -267,7 +255,6 @@ public class StockController {
                 }
                 technicalAnalysis.put("rsiSignal", rsiSignal);
 
-                // MACD analysis
                 if (latestIndicator.getMacdHistogram() > 0 && indicators.size() > 1) {
                     TechnicalIndicator previousIndicator = indicators.get(indicators.size() - 2);
                     if (latestIndicator.getMacdHistogram() > previousIndicator.getMacdHistogram()) {
@@ -285,7 +272,6 @@ public class StockController {
                 }
                 technicalAnalysis.put("macdSignal", macdSignal);
 
-                // Bollinger Bands analysis
                 if (latestIndicator.getPrice() > latestIndicator.getBollingerUpper()) {
                     bollingerSignal = "OVERBOUGHT";
                 } else if (latestIndicator.getPrice() < latestIndicator.getBollingerLower()) {
@@ -295,12 +281,10 @@ public class StockController {
 
                 analysis.put("technicalAnalysis", technicalAnalysis);
 
-                // Support and resistance levels
                 Map<String, Object> levels = new HashMap<>();
                 List<Double> supportLevels = new ArrayList<>();
                 List<Double> resistanceLevels = new ArrayList<>();
 
-                // Calculate support/resistance from recent data
                 for (int i = Math.max(0, indicators.size() - 30); i < indicators.size(); i++) {
                     TechnicalIndicator indicator = indicators.get(i);
                     if (i > 0 && i < indicators.size() - 1) {
@@ -329,7 +313,6 @@ public class StockController {
                 analysis.put("levels", levels);
             }
 
-            // Prediction data
             Map<String, Object> predictionData = new HashMap<>();
             predictionData.put("predictedPrice", prediction.getPredictedPrice());
             predictionData.put("predictedChangePercentage", prediction.getPredictedChangePercentage());
@@ -350,7 +333,6 @@ public class StockController {
 
             analysis.put("prediction", predictionData);
 
-            // Overall recommendation
             String recommendation = "HOLD";
             double bullishFactors = 0;
             double bearishFactors = 0;
@@ -403,7 +385,6 @@ public class StockController {
 
         List<Map<String, String>> results = new ArrayList<>();
 
-        // Search in existing symbols
         for (String symbol : allSymbols) {
             if (symbol.toUpperCase().contains(query.toUpperCase())) {
                 Map<String, String> result = new HashMap<>();
@@ -413,7 +394,6 @@ public class StockController {
             }
         }
 
-        // Add common stocks if not in results
         Map<String, String> commonStocks = getCommonStocks();
         for (Map.Entry<String, String> entry : commonStocks.entrySet()) {
             String symbol = entry.getKey();
@@ -428,7 +408,6 @@ public class StockController {
             }
         }
 
-        // Limit results
         if (results.size() > 20) {
             results = results.subList(0, 20);
         }
@@ -442,7 +421,7 @@ public class StockController {
 
         Map<String, Object> response = new HashMap<>();
         response.put("symbol", symbol);
-        response.put("valid", true); // Assume valid for now
+        response.put("valid", true);
         response.put("name", getCompanyName(symbol));
         response.put("message", "Symbol is valid. Data will be fetched when added to portfolio.");
 

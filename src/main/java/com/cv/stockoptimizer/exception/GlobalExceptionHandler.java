@@ -19,7 +19,6 @@ public class GlobalExceptionHandler {
 
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
 
-        // Determine appropriate status code based on exception type
         if (ex instanceof AIPortfolioException.InsufficientDataException) {
             status = HttpStatus.BAD_REQUEST;
             response.put("errorType", "INSUFFICIENT_DATA");

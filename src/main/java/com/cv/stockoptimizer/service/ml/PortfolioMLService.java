@@ -34,7 +34,6 @@ public class PortfolioMLService {
     private final StockDataRepository stockDataRepository;
     private final AIPortfolioUpgraderService aiPortfolioUpgraderService;
 
-    // Track training progress
     private final Map<String, TrainingProgress> trainingProgressMap = new ConcurrentHashMap<>();
 
     @Autowired
@@ -55,9 +54,6 @@ public class PortfolioMLService {
         this.aiPortfolioUpgraderService = aiPortfolioUpgraderService;
     }
 
-    /**
-     * Train ML models for all stocks in a portfolio
-     */
     public Map<String, Object> trainModelsForPortfolio(String portfolioId, boolean useSampleData) throws IOException {
         Portfolio portfolio = portfolioRepository.findById(portfolioId)
                 .orElseThrow(() -> new IllegalArgumentException("Portfolio not found"));
@@ -69,7 +65,6 @@ public class PortfolioMLService {
 
         logger.info("Starting ML training for portfolio {} with {} stocks", portfolioId, symbols.size());
 
-        // Initialize training progress
         TrainingProgress progress = new TrainingProgress(symbols.size());
         trainingProgressMap.put(portfolioId, progress);
 
@@ -78,7 +73,6 @@ public class PortfolioMLService {
         result.put("totalStocks", symbols.size());
         result.put("status", "training_started");
 
-        // Start async training
         CompletableFuture.runAsync(() -> {
             try {
                 trainStocksAsync(symbols, userId, portfolioId, useSampleData, progress);
@@ -92,9 +86,6 @@ public class PortfolioMLService {
         return result;
     }
 
-    /**
-     * Async method to train stocks
-     */
     private void trainStocksAsync(Set<String> symbols, String userId, String portfolioId,
                                   boolean useSampleData, TrainingProgress progress) {
         LocalDate endDate = LocalDate.now();
@@ -105,17 +96,14 @@ public class PortfolioMLService {
                 progress.setCurrentStock(symbol);
                 logger.info("Processing stock {} for portfolio {}", symbol, portfolioId);
 
-                // Step 1: Check if we already have sufficient data
                 List<StockData> existingData = stockDataRepository
                         .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, symbol, startDate, endDate);
 
                 if (existingData.size() < 100) {
-                    // Need to collect more data
                     progress.setCurrentStep("Collecting data for " + symbol);
                     List<StockData> historicalData;
 
                     try {
-                        // Try to fetch data (will automatically handle duplicates)
                         historicalData = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate, userId);
                         logger.info("Collected/verified {} data points for {}", historicalData.size(), symbol);
                     } catch (Exception e) {
@@ -126,7 +114,6 @@ public class PortfolioMLService {
                     logger.info("Using existing {} data points for {}", existingData.size(), symbol);
                 }
 
-                // Step 2: Calculate technical indicators
                 progress.setCurrentStep("Calculating indicators for " + symbol);
                 try {
                     List<?> indicators = indicatorService.calculateAllIndicators(symbol, startDate, endDate, userId);
@@ -135,7 +122,6 @@ public class PortfolioMLService {
                     logger.warn("Error calculating indicators for {}: {}", symbol, e.getMessage());
                 }
 
-                // Step 3: Train neural network model
                 progress.setCurrentStep("Training model for " + symbol);
                 MLModel model = neuralNetworkService.trainModelForStock(symbol, userId);
                 logger.info("Trained model for {} with error: {}", symbol, model.getTrainingError());
@@ -152,7 +138,6 @@ public class PortfolioMLService {
         progress.setStatus("completed");
         progress.setCurrentStep("Training completed");
 
-        // Update portfolio to indicate ML models are available
         Portfolio portfolio = portfolioRepository.findById(portfolioId).orElse(null);
         if (portfolio != null) {
             portfolio.setHasAiRecommendations(true);
@@ -160,9 +145,6 @@ public class PortfolioMLService {
         }
     }
 
-    /**
-     * Get ML training status for a portfolio
-     */
     public Map<String, Object> getPortfolioMLStatus(String portfolioId) {
         Map<String, Object> status = new HashMap<>();
 
@@ -174,7 +156,6 @@ public class PortfolioMLService {
                 .map(Portfolio.PortfolioStock::getSymbol)
                 .collect(Collectors.toSet());
 
-        // Check training progress
         TrainingProgress progress = trainingProgressMap.get(portfolioId);
         if (progress != null) {
             status.put("trainingInProgress", !progress.isCompleted());
@@ -183,7 +164,6 @@ public class PortfolioMLService {
             status.put("trainingInProgress", false);
         }
 
-        // Check existing models
         Map<String, Object> modelStatus = new HashMap<>();
         for (String symbol : symbols) {
             Optional<MLModel> model = mlModelRepository.findByUserIdAndSymbol(userId, symbol);
@@ -207,13 +187,9 @@ public class PortfolioMLService {
         return status;
     }
 
-    /**
-     * Generate personalized recommendations after training
-     */
     public Map<String, Object> generatePersonalizedRecommendations(
             String portfolioId, double riskTolerance, boolean expandUniverse) throws IOException {
 
-        // Check if all models are trained
         Map<String, Object> mlStatus = getPortfolioMLStatus(portfolioId);
         Long modelsReady = (Long) mlStatus.get("modelsReady");
         Integer totalStocks = (Integer) mlStatus.get("totalStocks");
@@ -224,13 +200,9 @@ public class PortfolioMLService {
                             modelsReady, totalStocks));
         }
 
-        // Use the existing AI portfolio upgrader service with the trained models
         return aiPortfolioUpgraderService.generatePortfolioUpgrade(portfolioId, riskTolerance, expandUniverse);
     }
 
-    /**
-     * Inner class to track training progress
-     */
     private static class TrainingProgress {
         private final int totalStocks;
         private int completedStocks = 0;
@@ -269,7 +241,6 @@ public class PortfolioMLService {
             return map;
         }
 
-        // Getters and setters
         public void setStatus(String status) { this.status = status; }
         public void setCurrentStock(String currentStock) { this.currentStock = currentStock; }
         public void setCurrentStep(String currentStep) { this.currentStep = currentStep; }

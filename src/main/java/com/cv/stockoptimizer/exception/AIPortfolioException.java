@@ -10,7 +10,6 @@ public class AIPortfolioException extends RuntimeException {
         super(message, cause);
     }
 
-    // Specific exception types
 
     public static class InsufficientDataException extends AIPortfolioException {
         public InsufficientDataException(String symbol) {

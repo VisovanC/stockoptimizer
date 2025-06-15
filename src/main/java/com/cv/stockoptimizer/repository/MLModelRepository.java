@@ -12,7 +12,7 @@ public interface MLModelRepository extends MongoRepository<MLModel, String> {
 
     Optional<MLModel> findByUserIdAndSymbol(String userId, String symbol);
 
-    Optional<MLModel> findBySymbol(String symbol);  // Keep for backward compatibility
+    Optional<MLModel> findBySymbol(String symbol);
 
     List<MLModel> findByModelType(String modelType);
 

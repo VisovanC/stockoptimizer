@@ -17,12 +17,10 @@ const PortfolioDetail = () => {
     const [riskTolerance, setRiskTolerance] = useState(0.5);
     const [expandUniverse, setExpandUniverse] = useState(false);
 
-    // ML Training states
     const [mlStatus, setMlStatus] = useState(null);
     const [training, setTraining] = useState(false);
     const [trainingProgress, setTrainingProgress] = useState(null);
 
-    // Safe number formatting functions
     const formatCurrency = (value) => {
         const numValue = parseFloat(value) || 0;
         return numValue.toFixed(2);
@@ -44,12 +42,11 @@ const PortfolioDetail = () => {
     }, [id]);
 
     useEffect(() => {
-        // Poll for training progress if training is in progress
         let interval;
         if (training && trainingProgress && trainingProgress.status === 'in_progress') {
             interval = setInterval(() => {
                 fetchMLStatus();
-            }, 2000); // Check every 2 seconds
+            }, 2000);
         }
         return () => clearInterval(interval);
     }, [training, trainingProgress]);
@@ -103,7 +100,6 @@ const PortfolioDetail = () => {
 
             if (response.status === 'training_started') {
                 toast.info(`ML training started for ${response.totalStocks} stocks`);
-                // Start polling for progress
                 fetchMLStatus();
             } else {
                 toast.error('Failed to start ML training');
@@ -129,7 +125,6 @@ const PortfolioDetail = () => {
     };
 
     const handleGetAIRecommendations = async () => {
-        // Check if models are trained
         if (!mlStatus || mlStatus.modelsReady < mlStatus.totalStocks) {
             toast.error('Please train ML models first before getting AI recommendations');
             return;

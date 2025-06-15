@@ -43,7 +43,6 @@ public class AuthController {
         System.out.println("Password length: " + (loginRequest.getPassword() != null ? loginRequest.getPassword().length() : 0));
 
         try {
-            // Check if user exists first
             User user = userRepository.findByUsername(loginRequest.getUsername()).orElse(null);
             if (user == null) {
                 System.out.println("✗ User not found: " + loginRequest.getUsername());
@@ -54,7 +53,6 @@ public class AuthController {
             System.out.println("✓ User enabled: " + user.isEnabled());
             System.out.println("✓ Stored password hash: " + user.getPassword().substring(0, Math.min(20, user.getPassword().length())) + "...");
 
-            // Test password matching
             boolean passwordMatches = encoder.matches(loginRequest.getPassword(), user.getPassword());
             System.out.println("✓ Password matches: " + passwordMatches);
 
@@ -104,7 +102,6 @@ public class AuthController {
                     .body(new MessageResponse("Error: Email is already in use!"));
         }
 
-        // Encode password
         String encodedPassword = encoder.encode(signupRequest.getPassword());
         System.out.println("✓ Password encoded: " + encodedPassword.substring(0, Math.min(20, encodedPassword.length())) + "...");
 
@@ -129,7 +126,6 @@ public class AuthController {
         }
     }
 
-    // Debug endpoint - remove in production
     @GetMapping("/debug/users")
     public ResponseEntity<?> getAllUsers() {
         try {

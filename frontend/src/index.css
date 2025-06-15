@@ -1,5 +1,3 @@
-/* Professional Stock Optimizer Theme */
-
 :root {
   --primary-orange: #FF6500;
   --primary-blue: #1E3E62;
@@ -29,7 +27,6 @@ body {
   color: #0B192C !important;
 }
 
-/* Typography */
 h1, h2, h3, h4, h5, h6 {
   color: #0B192C !important;
   font-weight: 600;
@@ -45,7 +42,6 @@ a:hover {
   color: #FF6500 !important;
 }
 
-/* Navigation Override */
 .navbar-dark {
   background-color: #0B192C !important;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -98,7 +94,6 @@ a:hover {
   color: #FFFFFF !important;
 }
 
-/* Buttons */
 .btn {
   font-weight: 500 !important;
   padding: 0.6rem 1.5rem !important;
@@ -198,7 +193,6 @@ a:hover {
   font-size: 0.875rem !important;
 }
 
-/* Cards */
 .card {
   border: none !important;
   box-shadow: 0 5px 20px rgba(0,0,0,0.08) !important;
@@ -224,7 +218,6 @@ a:hover {
   padding: 1.5rem !important;
 }
 
-/* Tables */
 .table {
   margin-bottom: 0;
 }
@@ -250,7 +243,6 @@ a:hover {
   background-color: rgba(30, 62, 98, 0.05) !important;
 }
 
-/* Badges */
 .badge {
   font-weight: 500 !important;
   padding: 0.4rem 0.8rem !important;
@@ -279,7 +271,6 @@ a:hover {
   background-color: #6c757d !important;
 }
 
-/* Forms */
 .form-control,
 .form-select {
   border-color: #e9ecef !important;
@@ -300,7 +291,6 @@ a:hover {
   margin-bottom: 0.5rem !important;
 }
 
-/* Alerts */
 .alert {
   border: none !important;
   border-radius: 8px !important;
@@ -317,12 +307,10 @@ a:hover {
   color: #28a745 !important;
 }
 
-/* Loading States */
 .spinner-border {
   color: #FF6500 !important;
 }
 
-/* Progress Bars */
 .progress {
   height: 10px !important;
   border-radius: 5px !important;
@@ -333,7 +321,6 @@ a:hover {
   background-color: #FF6500 !important;
 }
 
-/* Custom Utilities */
 .text-primary {
   color: #FF6500 !important;
 }
@@ -354,7 +341,6 @@ a:hover {
   color: #6c757d !important;
 }
 
-/* Dashboard Specific */
 .dashboard-header {
   background: linear-gradient(135deg, #0B192C 0%, #1E3E62 100%) !important;
   color: #FFFFFF !important;
@@ -367,7 +353,6 @@ a:hover {
   color: white !important;
 }
 
-/* Portfolio Specific */
 .portfolio-value {
   font-size: 2rem !important;
   font-weight: 700 !important;
@@ -384,7 +369,6 @@ a:hover {
   font-weight: 600 !important;
 }
 
-/* Charts - Recharts Customization */
 .recharts-cartesian-axis-tick-value {
   fill: #0B192C !important;
   font-size: 0.875rem !important;
@@ -394,7 +378,6 @@ a:hover {
   color: #0B192C !important;
 }
 
-/* Toast Notifications */
 .Toastify__toast {
   border-radius: 8px !important;
   font-weight: 500 !important;
@@ -408,7 +391,6 @@ a:hover {
   background-color: #dc3545 !important;
 }
 
-/* Modal */
 .modal-header {
   background-color: #f8f9fa !important;
   border-bottom: 2px solid #e9ecef !important;
@@ -419,7 +401,6 @@ a:hover {
   font-weight: 600 !important;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .navbar-brand {
     font-size: 1.2rem !important;
@@ -435,7 +416,6 @@ a:hover {
   }
 }
 
-/* Animation Classes */
 .fade-in {
   animation: fadeIn 0.3s ease-in;
 }
@@ -451,7 +431,6 @@ a:hover {
   }
 }
 
-/* Hover Effects */
 .hover-lift {
   transition: transform 0.3s ease, box-shadow 0.3s ease !important;
 }
@@ -461,7 +440,6 @@ a:hover {
   box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
 }
 
-/* Login/Register Pages */
 .min-vh-100 {
   background: linear-gradient(135deg, #0B192C 0%, #1E3E62 100%) !important;
 }

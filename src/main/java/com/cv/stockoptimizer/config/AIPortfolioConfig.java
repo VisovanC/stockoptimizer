@@ -17,7 +17,6 @@ public class AIPortfolioConfig {
     private int maxExpansionStocks = 10;
     private int cacheTimeoutMinutes = 30;
 
-    // Getters and setters
     public int getHistoricalDays() {
         return historicalDays;
     }

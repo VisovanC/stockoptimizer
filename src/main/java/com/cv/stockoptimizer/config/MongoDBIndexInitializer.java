@@ -22,15 +22,13 @@ public class MongoDBIndexInitializer {
         try {
             System.out.println("Initializing MongoDB indexes...");
 
-            // Drop the old index that doesn't include userId
             try {
                 mongoTemplate.indexOps("stock_data").dropIndex("symbol_date_idx");
                 System.out.println("Dropped old symbol_date_idx index");
             } catch (Exception e) {
-                // Index might not exist, which is fine
+
             }
 
-            // Create new index with userId included
             mongoTemplate.indexOps("stock_data").ensureIndex(
                     new Index().on("userId", Sort.Direction.ASC)
                             .on("symbol", Sort.Direction.ASC)
@@ -38,12 +36,10 @@ public class MongoDBIndexInitializer {
                             .unique()
                             .named("userId_symbol_date_idx"));
 
-            // Similar fix for technical_indicators
             try {
                 mongoTemplate.indexOps("technical_indicators").dropIndex("symbol_date_idx");
                 System.out.println("Dropped old technical_indicators index");
             } catch (Exception e) {
-                // Index might not exist, which is fine
             }
 
             mongoTemplate.indexOps("technical_indicators").ensureIndex(
@@ -53,7 +49,6 @@ public class MongoDBIndexInitializer {
                             .unique()
                             .named("userId_symbol_date_idx"));
 
-            // Other indexes remain the same
             mongoTemplate.indexOps("stock_predictions").ensureIndex(
                     new Index().on("symbol", Sort.Direction.ASC)
                             .on("predictionDate", Sort.Direction.DESC));

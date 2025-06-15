@@ -33,12 +33,11 @@ public class NeuralNetworkService {
     private final MLModelRepository mlModelRepository;
     private final StockPredictionRepository stockPredictionRepository;
 
-    // Reduced requirements for better compatibility
-    private static final int INPUT_WINDOW = 30; // Reduced from 60 to 30 days
+    private static final int INPUT_WINDOW = 30;
     private static final int PREDICTION_DAYS = 5;
-    private static final int HIDDEN_NEURONS = 30; // Reduced from 50
-    private static final double MAX_ERROR = 0.02; // Increased tolerance
-    private static final int MAX_EPOCHS = 500; // Reduced from 1000
+    private static final int HIDDEN_NEURONS = 30;
+    private static final double MAX_ERROR = 0.02;
+    private static final int MAX_EPOCHS = 500;
     private static final String MODEL_DIRECTORY = "models/";
 
     @Autowired
@@ -62,8 +61,7 @@ public class NeuralNetworkService {
 
         System.out.println("Found " + indicators.size() + " indicators for " + symbol);
 
-        // Minimum data check - reduced requirement
-        int minDataPoints = INPUT_WINDOW + PREDICTION_DAYS + 10; // Added buffer
+        int minDataPoints = INPUT_WINDOW + PREDICTION_DAYS + 10;
         if (indicators.size() < minDataPoints) {
             throw new IllegalArgumentException(
                     "Not enough data to prepare training set. Need at least " + minDataPoints +
@@ -74,36 +72,29 @@ public class NeuralNetworkService {
         MLDataSet dataSet = new BasicMLDataSet();
         int validPairs = 0;
 
-        // Create training pairs with better error handling
         for (int i = 0; i <= indicators.size() - INPUT_WINDOW - PREDICTION_DAYS; i++) {
             try {
-                double[] input = new double[INPUT_WINDOW * 5]; // Reduced features from 10 to 5
+                double[] input = new double[INPUT_WINDOW * 5];
                 int inputIndex = 0;
 
                 double basePrice = indicators.get(i).getPrice();
                 if (basePrice <= 0) continue;
 
-                // Fill input with essential features only
                 for (int j = i; j < i + INPUT_WINDOW; j++) {
                     TechnicalIndicator indicator = indicators.get(j);
 
-                    // Price (normalized)
                     input[inputIndex++] = indicator.getPrice() / basePrice;
 
-                    // RSI (normalized to 0-1)
                     double rsi = indicator.getRsi14() != null ? indicator.getRsi14() / 100.0 : 0.5;
                     input[inputIndex++] = Math.max(0, Math.min(1, rsi));
 
-                    // SMA ratio
                     double sma20 = indicator.getSma20() != null ? indicator.getSma20() : indicator.getPrice();
                     input[inputIndex++] = sma20 / basePrice;
 
-                    // MACD normalized
                     double macd = indicator.getMacdHistogram() != null ?
                             Math.tanh(indicator.getMacdHistogram() / basePrice) : 0.0;
                     input[inputIndex++] = macd;
 
-                    // Bollinger band position
                     double bbUpper = indicator.getBollingerUpper() != null ?
                             indicator.getBollingerUpper() : indicator.getPrice() * 1.02;
                     double bbLower = indicator.getBollingerLower() != null ?
@@ -112,18 +103,16 @@ public class NeuralNetworkService {
                     input[inputIndex++] = Math.max(0, Math.min(1, bbPosition));
                 }
 
-                // Calculate output
                 double futurePrice = indicators.get(i + INPUT_WINDOW + PREDICTION_DAYS - 1).getPrice();
                 double currentPrice = indicators.get(i + INPUT_WINDOW - 1).getPrice();
 
                 if (currentPrice <= 0) continue;
 
                 double priceChange = (futurePrice - currentPrice) / currentPrice;
-                priceChange = Math.max(-0.2, Math.min(0.2, priceChange)); // Clip to ±20%
+                priceChange = Math.max(-0.2, Math.min(0.2, priceChange));
 
                 double[] output = new double[] { priceChange };
 
-                // Validate data
                 boolean validData = true;
                 for (double v : input) {
                     if (Double.isNaN(v) || Double.isInfinite(v)) {
@@ -144,7 +133,7 @@ public class NeuralNetworkService {
 
         System.out.println("Created " + validPairs + " valid training pairs for " + symbol);
 
-        if (validPairs < 5) { // Reduced minimum requirement
+        if (validPairs < 5) {
             throw new IllegalArgumentException(
                     "Not enough valid training pairs. Need at least 5, but only created " + validPairs
             );
@@ -156,10 +145,9 @@ public class NeuralNetworkService {
     public BasicNetwork createNetwork() {
         BasicNetwork network = new BasicNetwork();
 
-        // Simplified network architecture
-        network.addLayer(new BasicLayer(null, true, INPUT_WINDOW * 5)); // Input layer
-        network.addLayer(new BasicLayer(new ActivationTANH(), true, HIDDEN_NEURONS)); // Hidden layer
-        network.addLayer(new BasicLayer(new ActivationTANH(), false, 1)); // Output layer
+        network.addLayer(new BasicLayer(null, true, INPUT_WINDOW * 5));
+        network.addLayer(new BasicLayer(new ActivationTANH(), true, HIDDEN_NEURONS));
+        network.addLayer(new BasicLayer(new ActivationTANH(), false, 1));
 
         network.getStructure().finalizeStructure();
         network.reset();
@@ -205,7 +193,6 @@ public class NeuralNetworkService {
         LocalDate today = LocalDate.now();
         LocalDate trainStart = today.minusYears(2);
 
-        // First, ensure we have enough indicators
         List<TechnicalIndicator> indicators = technicalIndicatorRepository
                 .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, symbol, trainStart, today);
 
@@ -286,7 +273,7 @@ public class NeuralNetworkService {
         BasicNetwork network = loadModel(symbol, userId);
 
         LocalDate today = LocalDate.now();
-        LocalDate startDate = today.minusDays(INPUT_WINDOW + 30); // Extra buffer
+        LocalDate startDate = today.minusDays(INPUT_WINDOW + 30);
 
         List<TechnicalIndicator> recentData = technicalIndicatorRepository
                 .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, symbol, startDate, today);
@@ -303,7 +290,6 @@ public class NeuralNetworkService {
         List<TechnicalIndicator> inputWindow = recentData.subList(
                 recentData.size() - INPUT_WINDOW, recentData.size());
 
-        // Prepare input
         double[] input = new double[INPUT_WINDOW * 5];
         int inputIndex = 0;
         double basePrice = inputWindow.get(0).getPrice();
@@ -360,9 +346,8 @@ public class NeuralNetworkService {
     }
 
     private double calculateConfidenceScore(double prediction) {
-        // Confidence based on prediction magnitude
         double magnitude = Math.abs(prediction);
-        if (magnitude < 0.01) return 50.0; // Very small change = low confidence
+        if (magnitude < 0.01) return 50.0;
         if (magnitude < 0.05) return 70.0;
         if (magnitude < 0.10) return 80.0;
         return Math.min(90.0, 80.0 + magnitude * 100);

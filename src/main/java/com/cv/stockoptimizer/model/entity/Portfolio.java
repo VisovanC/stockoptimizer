@@ -21,7 +21,7 @@ public class Portfolio extends AuditableEntity {
     private Double totalReturn;
     private Double totalReturnPercentage;
     private Double riskScore;
-    private String optimizationStatus; // "NOT_OPTIMIZED", "OPTIMIZING", "OPTIMIZED"
+    private String optimizationStatus;
     private LocalDateTime lastOptimizedAt;
     private Boolean hasAiRecommendations = false;
     private LocalDateTime lastAiRecommendationDate;
@@ -125,7 +125,6 @@ public class Portfolio extends AuditableEntity {
         }
     }
 
-    // Getters and setters
     public String getId() {
         return id;
     }

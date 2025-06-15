@@ -14,10 +14,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
-
-/**
- * Controller for ML-powered portfolio training and recommendations
- */
 @RestController
 @RequestMapping("/api/ml/portfolio")
 @Tag(name = "Portfolio ML", description = "Machine Learning operations for portfolios")
@@ -30,9 +26,6 @@ public class PortfolioMLController {
         this.portfolioMLService = portfolioMLService;
     }
 
-    /**
-     * Get ML training status for a portfolio
-     */
     @Operation(
             summary = "Get ML training status",
             description = "Get the status of ML models for stocks in a portfolio"
@@ -62,9 +55,6 @@ public class PortfolioMLController {
         }
     }
 
-    /**
-     * Start ML model training for all stocks in a portfolio
-     */
     @Operation(
             summary = "Train ML models for portfolio",
             description = "Start training neural network models for all stocks in a portfolio"
@@ -98,9 +88,6 @@ public class PortfolioMLController {
         }
     }
 
-    /**
-     * Get personalized AI recommendations based on trained ML models
-     */
     @Operation(
             summary = "Get ML-based recommendations",
             description = "Generate portfolio recommendations using trained neural network models"
@@ -126,7 +113,6 @@ public class PortfolioMLController {
         String currentUserId = getCurrentUserId();
 
         try {
-            // Check ML status first
             Map<String, Object> mlStatus = portfolioMLService.getPortfolioMLStatus(portfolioId);
             Long modelsReady = (Long) mlStatus.get("modelsReady");
             Integer totalStocks = (Integer) mlStatus.get("totalStocks");
@@ -139,7 +125,6 @@ public class PortfolioMLController {
                 return ResponseEntity.badRequest().body(response);
             }
 
-            // Generate recommendations
             Map<String, Object> recommendations = portfolioMLService.generatePersonalizedRecommendations(
                     portfolioId, riskTolerance, expandUniverse);
 
@@ -159,9 +144,6 @@ public class PortfolioMLController {
         }
     }
 
-    /**
-     * Get the current user ID from the security context
-     */
     private String getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getName();

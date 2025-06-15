@@ -23,10 +23,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Command line runner to test stock optimization services
- * Uncomment the methods you want to run in the run() method
- */
 @Component
 public class StockServiceRunner implements CommandLineRunner {
 
@@ -52,7 +48,6 @@ public class StockServiceRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // Uncomment the methods you want to run
 
         // Step 1: Collect historical data for basic stocks
         //collectDataForBasicStocks();
@@ -72,16 +67,11 @@ public class StockServiceRunner implements CommandLineRunner {
         // Or process multiple stocks in one go
         // processMultipleStocksEndToEnd(Arrays.asList("AAPL", "MSFT", "GOOGL"));
 
-        // For future: Train models based on user portfolio
-        // trainModelsForUserPortfolio("userId123");
-
         System.out.println("StockServiceRunner completed");
         System.out.println("StockServiceRunner: Automatic initialization disabled.");
         System.out.println("Data collection is now user-specific through API endpoints.");
 
-        // Optional: Just print current status
         System.out.println("Current system status:");
-       // System.out.println("- Total users: " + userRepository.count());
         System.out.println("- Total portfolios: " + portfolioRepository.count());
     }
 
@@ -90,28 +80,19 @@ public class StockServiceRunner implements CommandLineRunner {
         return authentication.getName();
     }
 
-    /**
-     * Collect historical data for a predefined list of basic stocks
-     */
     private void collectDataForBasicStocks() {
         System.out.println("Starting data collection for basic stocks...");
 
-        // List of stocks to collect data for
         List<String> basicStocks = Arrays.asList("AAPL", "MSFT", "GOOGL", "AMZN", "TSLA");
         String userId = getCurrentUserId();
-        // Date range for historical data (2 years)
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusYears(2);
 
         for (String symbol : basicStocks) {
             try {
                 System.out.println("Collecting data for " + symbol + "...");
-
-                // Fetch data from Yahoo Finance
                 List<StockData> data = dataCollectorService.fetchHistoricalData(
                         symbol, startDate, endDate, userId);
-
-                // Save to MongoDB
                 stockDataRepository.saveAll(data);
 
                 System.out.println("Successfully collected " + data.size() +
@@ -126,31 +107,21 @@ public class StockServiceRunner implements CommandLineRunner {
         System.out.println("Data collection completed!");
     }
 
-    /**
-     * Calculate technical indicators for basic stocks
-     */
     private void calculateIndicatorsForBasicStocks() {
         System.out.println("Starting technical indicator calculation...");
-
-        // List of stocks to calculate indicators for
         List<String> basicStocks = Arrays.asList("AAPL", "MSFT", "GOOGL", "AMZN", "TSLA");
-
-        // Date range for indicators (same as historical data)
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusYears(2);
 
         for (String symbol : basicStocks) {
             try {
                 System.out.println("Calculating indicators for " + symbol + "...");
-
-                // Calculate all technical indicators
                 List<TechnicalIndicator> indicators = indicatorService
                         .calculateAllIndicators(symbol, startDate, endDate, getCurrentUserId());
 
                 System.out.println("Successfully calculated " + indicators.size() +
                         " indicators for " + symbol);
 
-                // Verify some indicator values for the most recent data point
                 if (!indicators.isEmpty()) {
                     TechnicalIndicator latest = indicators.get(indicators.size() - 1);
                     System.out.println("Latest indicators for " + symbol + " on " +
@@ -172,20 +143,13 @@ public class StockServiceRunner implements CommandLineRunner {
         System.out.println("Technical indicator calculation completed!");
     }
 
-    /**
-     * Train neural network models for basic stocks
-     */
     private void trainModelsForBasicStocks() {
         System.out.println("Starting neural network model training...");
-
-        // List of stocks to train models for
         List<String> basicStocks = Arrays.asList("AAPL", "MSFT", "GOOGL", "AMZN", "TSLA");
 
         for (String symbol : basicStocks) {
             try {
                 System.out.println("Training model for " + symbol + "...");
-
-                // Train the neural network model
                 MLModel model = neuralNetworkService.trainModelForStock(getCurrentUserId(), symbol);
 
                 System.out.println("Successfully trained model for " + symbol + ":");
@@ -204,20 +168,13 @@ public class StockServiceRunner implements CommandLineRunner {
         System.out.println("Neural network model training completed!");
     }
 
-    /**
-     * Make predictions for basic stocks
-     */
     private void makePredictionsForBasicStocks() {
         System.out.println("Starting stock price predictions...");
-
-        // List of stocks to make predictions for
         List<String> basicStocks = Arrays.asList("AAPL", "MSFT", "GOOGL", "AMZN", "TSLA");
 
         for (String symbol : basicStocks) {
             try {
                 System.out.println("Making predictions for " + symbol + "...");
-
-                // Generate predictions
                 List<StockPrediction> predictions =
                         neuralNetworkService.predictFuturePrices(symbol, getCurrentUserId());
 
@@ -246,16 +203,10 @@ public class StockServiceRunner implements CommandLineRunner {
         System.out.println("Stock price predictions completed!");
     }
 
-    /**
-     * Process a stock from data collection to prediction
-     *
-     * @param symbol Stock ticker symbol
-     */
     private void processStockEndToEnd(String symbol) {
         System.out.println("Starting end-to-end process for " + symbol + "...");
 
         try {
-            // Step 1: Collect historical data
             System.out.println("Step 1: Collecting historical data...");
             LocalDate endDate = LocalDate.now();
             LocalDate startDate = endDate.minusYears(2);
@@ -265,21 +216,17 @@ public class StockServiceRunner implements CommandLineRunner {
             stockDataRepository.saveAll(data);
 
             System.out.println("Collected " + data.size() + " data points");
-
-            // Step 2: Calculate technical indicators
             System.out.println("Step 2: Calculating technical indicators...");
             List<TechnicalIndicator> indicators = indicatorService
                     .calculateAllIndicators(symbol, startDate, endDate, getCurrentUserId());
 
             System.out.println("Calculated " + indicators.size() + " indicators");
 
-            // Step 3: Train neural network model
             System.out.println("Step 3: Training neural network model...");
             MLModel model = neuralNetworkService.trainModelForStock(symbol);
 
             System.out.println("Model trained with error: " + model.getTrainingError());
 
-            // Step 4: Make predictions
             System.out.println("Step 4: Making predictions...");
             List<StockPrediction> predictions =
                     neuralNetworkService.predictFuturePrices(symbol, getCurrentUserId());
@@ -304,11 +251,6 @@ public class StockServiceRunner implements CommandLineRunner {
         }
     }
 
-    /**
-     * Process multiple stocks from data collection to prediction
-     *
-     * @param symbols List of stock ticker symbols
-     */
     private void processMultipleStocksEndToEnd(List<String> symbols) {
         System.out.println("Starting end-to-end process for multiple stocks: " + symbols);
 
@@ -317,24 +259,16 @@ public class StockServiceRunner implements CommandLineRunner {
                 processStockEndToEnd(symbol);
             } catch (Exception e) {
                 System.err.println("Error processing " + symbol + ": " + e.getMessage());
-                // Continue with next stock
             }
         }
 
         System.out.println("End-to-end process for multiple stocks completed!");
     }
 
-    /**
-     * Train models for stocks in a user's portfolio
-     * For future use when user portfolios are implemented
-     *
-     * @param userId User ID to get portfolios for
-     */
     public void trainModelsForUserPortfolio(String userId) {
         System.out.println("Training models for user portfolio (user ID: " + userId + ")...");
 
         try {
-            // Get user's portfolio from the database
             List<Portfolio> userPortfolios = portfolioRepository.findByUserId(userId);
 
             if (userPortfolios.isEmpty()) {
@@ -342,7 +276,6 @@ public class StockServiceRunner implements CommandLineRunner {
                 return;
             }
 
-            // Extract unique stock symbols from all user portfolios
             Set<String> userStocks = new HashSet<>();
             for (Portfolio portfolio : userPortfolios) {
                 for (Portfolio.PortfolioStock stock : portfolio.getStocks()) {
@@ -353,30 +286,23 @@ public class StockServiceRunner implements CommandLineRunner {
             System.out.println("Found " + userStocks.size() +
                     " unique stocks in user portfolios");
 
-            // Process each stock
             for (String symbol : userStocks) {
                 try {
-                    // Collect recent data if needed
                     LocalDate endDate = LocalDate.now();
                     LocalDate startDate = endDate.minusYears(2);
-
-                    // Check if we already have data
                     List<StockData> existingData = stockDataRepository
                             .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(
                                     getCurrentUserId() ,symbol, startDate, endDate);
 
-                    if (existingData.size() < 100) { // Arbitrary threshold
+                    if (existingData.size() < 100) {
                         System.out.println("Collecting data for " + symbol + "...");
                         List<StockData> newData = dataCollectorService
                                 .fetchHistoricalData(symbol, startDate, endDate, getCurrentUserId());
                         stockDataRepository.saveAll(newData);
                     }
-
-                    // Calculate indicators
                     System.out.println("Calculating indicators for " + symbol + "...");
                     indicatorService.calculateAllIndicators(symbol, startDate, endDate, getCurrentUserId());
 
-                    // Train model
                     System.out.println("Training model for " + symbol + "...");
                     MLModel model = neuralNetworkService.trainModelForStock(symbol);
 
@@ -384,7 +310,6 @@ public class StockServiceRunner implements CommandLineRunner {
                 } catch (Exception e) {
                     System.err.println("Error processing " + symbol + ": " +
                             e.getMessage());
-                    // Continue with next stock instead of stopping the whole process
                 }
             }
 
@@ -395,10 +320,6 @@ public class StockServiceRunner implements CommandLineRunner {
         }
     }
 
-    /**
-     * Utility method to create the ./models directory if it doesn't exist
-     * This is where the neural network models are saved
-     */
     private void ensureModelsDirectoryExists() {
         try {
             java.io.File modelsDir = new java.io.File("./models");

@@ -89,16 +89,13 @@ public class PortfolioController {
         List<Portfolio.PortfolioStock> stocks = new ArrayList<>();
 
         if (portfolioRequest.getStocks() != null) {
-            // Collect unique symbols to check for data
             Set<String> uniqueSymbols = new HashSet<>();
             for (StockRequest stockRequest : portfolioRequest.getStocks()) {
                 uniqueSymbols.add(stockRequest.getSymbol().toUpperCase());
             }
 
-            // Ensure we have data for all symbols
             ensureStockDataExists(uniqueSymbols, currentUserId);
 
-            // Create portfolio stocks
             for (StockRequest stockRequest : portfolioRequest.getStocks()) {
                 Portfolio.PortfolioStock stock = new Portfolio.PortfolioStock();
                 stock.setSymbol(stockRequest.getSymbol().toUpperCase());
@@ -136,13 +133,11 @@ public class PortfolioController {
         if (portfolioRequest.getStocks() != null) {
             List<Portfolio.PortfolioStock> stocks = new ArrayList<>();
 
-            // Collect unique symbols to check for data
             Set<String> uniqueSymbols = new HashSet<>();
             for (StockRequest stockRequest : portfolioRequest.getStocks()) {
                 uniqueSymbols.add(stockRequest.getSymbol().toUpperCase());
             }
 
-            // Ensure we have data for all symbols
             ensureStockDataExists(uniqueSymbols, currentUserId);
 
             for (StockRequest stockRequest : portfolioRequest.getStocks()) {
@@ -244,48 +239,36 @@ public class PortfolioController {
         return authentication.getName();
     }
 
-    /**
-     * Ensure stock data exists for all symbols in the portfolio
-     * If data doesn't exist, try to fetch from Yahoo Finance or generate sample data
-     */
     private void ensureStockDataExists(Set<String> symbols, String userId) {
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusYears(2);
 
         for (String symbol : symbols) {
-            // Check if we have data for this symbol
             List<StockData> existingData = stockDataRepository
                     .findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(userId, symbol, startDate, endDate);
 
-            if (existingData.size() < 100) { // Need at least 100 data points
+            if (existingData.size() < 100) {
                 System.out.println("Insufficient data for " + symbol + ", fetching/generating data...");
-
-                // Run data collection asynchronously to avoid blocking the request
                 CompletableFuture.runAsync(() -> {
                     try {
-                        // First try Yahoo Finance
                         List<StockData> historicalData = marketDataCollectorService
                                 .fetchHistoricalData(symbol, startDate, endDate, userId);
 
                         if (historicalData.isEmpty() || historicalData.size() < 100) {
-                            // Fall back to sample data
                             System.out.println("Yahoo Finance failed or insufficient data for " + symbol +
                                     ", generating sample data...");
                             historicalData = marketDataCollectorService
                                     .generateSampleData(symbol, startDate, endDate, userId);
                         }
 
-                        // Save the data
                         stockDataRepository.saveAll(historicalData);
                         System.out.println("Saved " + historicalData.size() + " data points for " + symbol);
 
-                        // Calculate technical indicators
                         technicalIndicatorService.calculateAllIndicators(symbol, startDate, endDate, userId);
                         System.out.println("Calculated technical indicators for " + symbol);
 
                     } catch (Exception e) {
                         System.err.println("Error ensuring data for " + symbol + ": " + e.getMessage());
-                        // Generate sample data as last resort
                         try {
                             List<StockData> sampleData = marketDataCollectorService
                                     .generateSampleData(symbol, startDate, endDate, userId);

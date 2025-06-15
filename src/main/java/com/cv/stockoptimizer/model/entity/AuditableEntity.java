@@ -8,9 +8,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
-/**
- * Base class for auditable entities
- */
 public abstract class AuditableEntity {
 
     @CreatedBy

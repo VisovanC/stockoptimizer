@@ -10,9 +10,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Controller for AI recommendation performance metrics
- */
 @RestController
 @RequestMapping("/api/ai/metrics")
 public class AIMetricsController {
@@ -24,9 +21,6 @@ public class AIMetricsController {
         this.aiMetricsService = aiMetricsService;
     }
 
-    /**
-     * Get performance metrics for a specific portfolio's AI recommendations
-     */
     @GetMapping("/portfolio/{portfolioId}")
     public ResponseEntity<?> getPortfolioPerformance(@PathVariable String portfolioId) {
         String currentUserId = getCurrentUserId();
@@ -36,13 +30,8 @@ public class AIMetricsController {
         return ResponseEntity.ok(metrics);
     }
 
-    /**
-     * Get aggregate performance statistics for all AI recommendations
-     */
     @GetMapping("/aggregate")
     public ResponseEntity<?> getAggregateStats() {
-        // Only allow admin users to access aggregate stats
-        // Simplified check for example purposes
         String currentUserId = getCurrentUserId();
 
         Map<String, Object> stats = aiMetricsService.getAggregatePerformanceStats();
@@ -50,10 +39,7 @@ public class AIMetricsController {
         return ResponseEntity.ok(stats);
     }
 
-    /**
-     * Record the application of AI recommendations to a portfolio
-     * This is called internally by the AIPortfolioController
-     */
+
     @PostMapping("/record/{portfolioId}")
     public ResponseEntity<?> recordRecommendationApplication(
             @PathVariable String portfolioId,
@@ -70,9 +56,6 @@ public class AIMetricsController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Get the current user ID from the security context
-     */
     private String getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getName();

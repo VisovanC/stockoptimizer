@@ -19,9 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Controller for AI-powered portfolio upgrading
- */
+
 @RestController
 @RequestMapping("/api/ai/portfolio")
 @Tag(name = "AI Portfolio", description = "AI portfolio optimization operations")
@@ -38,9 +36,6 @@ public class AIPortfolioController {
         this.aiMetricsService = aiMetricsService;
     }
 
-    /**
-     * Generate AI-powered upgrade recommendations for a portfolio
-     */
     @Operation(
             summary = "Generate AI portfolio upgrade recommendations",
             description = "Analyzes a portfolio and generates AI-powered optimization recommendations"
@@ -78,9 +73,6 @@ public class AIPortfolioController {
         }
     }
 
-    /**
-     * Apply AI-recommended upgrades to a portfolio
-     */
     @Operation(
             summary = "Apply AI portfolio upgrade",
             description = "Applies AI-recommended allocations to a portfolio"
@@ -107,7 +99,6 @@ public class AIPortfolioController {
             Portfolio upgradedPortfolio = aiPortfolioUpgraderService.applyPortfolioUpgrade(
                     portfolioId, optimizedAllocations);
 
-            // Record the application for performance tracking
             aiMetricsService.recordRecommendationApplication(portfolioId, optimizedAllocations);
 
             Map<String, Object> response = new HashMap<>();
@@ -124,9 +115,6 @@ public class AIPortfolioController {
         }
     }
 
-    /**
-     * Get the current user ID from the security context
-     */
     private String getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getName();

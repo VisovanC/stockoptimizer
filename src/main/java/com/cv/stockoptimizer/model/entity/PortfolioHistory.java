@@ -7,9 +7,6 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Entity to store portfolio change history for audit and performance tracking
- */
 @Document(collection = "portfolio_history")
 public class PortfolioHistory extends AuditableEntity {
 
@@ -18,7 +15,7 @@ public class PortfolioHistory extends AuditableEntity {
 
     private String portfolioId;
     private String userId;
-    private String changeType; // "CREATION", "UPDATE", "AI_RECOMMENDATION", "REBALANCE"
+    private String changeType;
     private LocalDateTime changeDate;
     private Map<String, Double> previousAllocations = new HashMap<>();
     private Map<String, Double> newAllocations = new HashMap<>();
@@ -27,13 +24,12 @@ public class PortfolioHistory extends AuditableEntity {
     private String aiModelVersion;
     private Double riskTolerance;
     private String changeReason;
-    private String changeSource; // "USER", "AI", "SCHEDULED"
+    private String changeSource;
 
     public PortfolioHistory() {
         this.changeDate = LocalDateTime.now();
     }
 
-    // Getters and setters
 
     public String getId() {
         return id;

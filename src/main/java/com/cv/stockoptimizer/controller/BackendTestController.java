@@ -58,7 +58,7 @@ public class BackendTestController {
         if (authentication != null && authentication.isAuthenticated()) {
             return authentication.getName();
         }
-        return "system"; // Default user for test endpoints
+        return "system";
     }
 
     @GetMapping("/ping")

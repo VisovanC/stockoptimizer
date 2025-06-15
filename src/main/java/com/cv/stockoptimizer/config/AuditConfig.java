@@ -9,16 +9,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Optional;
 
-/**
- * Configuration for MongoDB auditing
- */
+
 @Configuration
 @EnableMongoAuditing
 public class AuditConfig {
 
-    /**
-     * Bean to provide the current auditor (user)
-     */
     @Bean
     public AuditorAware<String> auditorProvider() {
         return () -> {

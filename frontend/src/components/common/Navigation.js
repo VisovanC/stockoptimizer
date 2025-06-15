@@ -13,7 +13,7 @@ const Navigation = () => {
     };
 
     if (!isAuthenticated) {
-        return null; // Don't show navigation for non-authenticated users
+        return null;
     }
 
     return (

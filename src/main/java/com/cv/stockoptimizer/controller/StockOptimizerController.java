@@ -20,9 +20,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.*;
 
-/**
- * REST API for stock optimization services
- */
 @RestController
 @RequestMapping("/api/stock-optimizer")
 public class StockOptimizerController {
@@ -58,21 +55,15 @@ public class StockOptimizerController {
         if (authentication != null && authentication.isAuthenticated()) {
             return authentication.getName();
         }
-        return "system"; // Default user for unauthenticated requests
+        return "system";
     }
 
-    /**
-     * Get all available stock symbols in the database
-     */
     @GetMapping("/symbols")
     public ResponseEntity<Set<String>> getAllSymbols() {
         Set<String> symbols = stockDataRepository.findDistinctSymbols();
         return ResponseEntity.ok(symbols);
     }
 
-    /**
-     * Collect historical data for a stock
-     */
     @PostMapping("/data/collect/{symbol}")
     public ResponseEntity<?> collectData(
             @PathVariable String symbol,
@@ -185,18 +176,12 @@ public class StockOptimizerController {
         }
     }
 
-    /**
-     * Get information about trained models
-     */
     @GetMapping("/models")
     public ResponseEntity<List<MLModel>> getModels() {
         List<MLModel> models = mlModelRepository.findAll();
         return ResponseEntity.ok(models);
     }
 
-    /**
-     * Get information about a specific model
-     */
     @GetMapping("/models/{symbol}")
     public ResponseEntity<?> getModel(@PathVariable String symbol) {
         Optional<MLModel> model = mlModelRepository.findBySymbol(symbol.toUpperCase());
@@ -245,9 +230,6 @@ public class StockOptimizerController {
         }
     }
 
-    /**
-     * Get predictions for a stock
-     */
     @GetMapping("/predictions/{symbol}")
     public ResponseEntity<List<StockPrediction>> getPredictions(@PathVariable String symbol) {
         List<StockPrediction> predictions = stockPredictionRepository

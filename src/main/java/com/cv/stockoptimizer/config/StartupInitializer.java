@@ -14,7 +14,6 @@ public class StartupInitializer {
         return args -> {
             System.out.println("=== Stock Portfolio Optimizer Starting ===");
 
-            // Ensure models directory exists
             File modelsDir = new File("./models");
             if (!modelsDir.exists()) {
                 boolean created = modelsDir.mkdirs();
@@ -23,7 +22,6 @@ public class StartupInitializer {
                 System.out.println("Models directory exists: " + modelsDir.getAbsolutePath());
             }
 
-            // List existing models
             File[] modelFiles = modelsDir.listFiles((dir, name) -> name.endsWith(".eg"));
             if (modelFiles != null && modelFiles.length > 0) {
                 System.out.println("Found " + modelFiles.length + " existing models:");
