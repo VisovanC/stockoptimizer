@@ -32,11 +32,9 @@ public class MLController {
     private final MLModelRepository mlModelRepository;
     private final StockPredictionRepository stockPredictionRepository;
 
-    // Basic stocks to work with
     private static final List<String> BASIC_STOCKS = Arrays.asList("AAPL", "MSFT", "GOOGL", "AMZN", "TSLA");
+
     private String getCurrentUserId() {
-        // For now, return "system" as default
-        // In a real implementation, this would get the user from the security context
         return "system";
     }
 
@@ -57,7 +55,6 @@ public class MLController {
         this.mlModelRepository = mlModelRepository;
         this.stockPredictionRepository = stockPredictionRepository;
 
-        // Ensure models directory exists
         ensureModelsDirectoryExists();
     }
 
@@ -66,7 +63,6 @@ public class MLController {
         Map<String, Object> status = new HashMap<>();
 
         try {
-            // Get database counts
             long stockDataCount = stockDataRepository.count();
             Set<String> symbols = stockDataRepository.findDistinctSymbolsByUserId(getCurrentUserId());
             long modelCount = mlModelRepository.count();
@@ -95,12 +91,10 @@ public class MLController {
 
         try {
             System.out.println("Starting data collection for basic stocks...");
-            if (useSampleData) {
-                System.out.println("Using sample data mode due to Yahoo Finance rate limiting");
-            }
+            System.out.println("Mode: " + (useSampleData ? "Sample Data" : "Yahoo Finance"));
 
             LocalDate endDate = LocalDate.now();
-            LocalDate startDate = endDate.minusYears(2); // Reduced to 2 years
+            LocalDate startDate = endDate.minusYears(2);
 
             List<String> successfulStocks = new ArrayList<>();
             List<String> failedStocks = new ArrayList<>();
@@ -109,54 +103,42 @@ public class MLController {
             for (int i = 0; i < BASIC_STOCKS.size(); i++) {
                 String symbol = BASIC_STOCKS.get(i);
                 try {
-                    // Add delay between stocks to avoid rate limiting
                     if (i > 0 && !useSampleData) {
-                        Thread.sleep(3000); // 3 seconds between stocks
+                        Thread.sleep(4000);
                     }
 
                     System.out.println("Collecting data for " + symbol + "...");
                     List<StockData> data;
 
                     if (useSampleData) {
-                        // Use sample data generator
                         data = dataCollectorService.generateSampleData(symbol, startDate, endDate, getCurrentUserId());
-                    } else {
-                        // Try to fetch from Yahoo Finance
-                        data = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate, getCurrentUserId());
-
-                        // If Yahoo Finance fails, fall back to sample data
-                        if (data.isEmpty()) {
-                            System.out.println("Yahoo Finance failed, using sample data for " + symbol);
-                            data = dataCollectorService.generateSampleData(symbol, startDate, endDate, getCurrentUserId());
-                        }
-                    }
-
-                    if (!data.isEmpty()) {
                         stockDataRepository.saveAll(data);
                         successfulStocks.add(symbol);
                         totalDataPoints += data.size();
-                        System.out.println("Successfully collected " + data.size() + " data points for " + symbol);
+                        System.out.println("Generated " + data.size() + " sample data points for " + symbol);
                     } else {
-                        failedStocks.add(symbol);
-                        System.out.println("No data retrieved for " + symbol);
+                        try {
+                            data = dataCollectorService.fetchHistoricalData(symbol, startDate, endDate, getCurrentUserId());
+
+                            if (!data.isEmpty()) {
+                                successfulStocks.add(symbol);
+                                totalDataPoints += data.size();
+                                System.out.println("Successfully collected " + data.size() + " data points for " + symbol);
+                            } else {
+                                failedStocks.add(symbol);
+                                System.out.println("No data retrieved for " + symbol);
+                            }
+                        } catch (Exception e) {
+                            System.err.println("Yahoo Finance error for " + symbol + ": " + e.getMessage());
+                            failedStocks.add(symbol);
+                        }
                     }
                 } catch (Exception e) {
                     System.err.println("Error collecting data for " + symbol + ": " + e.getMessage());
-
-                    // Try sample data as fallback
-                    try {
-                        List<StockData> sampleData = dataCollectorService.generateSampleData(symbol, startDate, endDate, getCurrentUserId());
-                        stockDataRepository.saveAll(sampleData);
-                        successfulStocks.add(symbol + " (sample)");
-                        totalDataPoints += sampleData.size();
-                        System.out.println("Used sample data for " + symbol);
-                    } catch (Exception ex) {
-                        failedStocks.add(symbol);
-                    }
+                    failedStocks.add(symbol);
                 }
             }
 
-            // Also calculate technical indicators
             System.out.println("Calculating technical indicators...");
             for (String symbol : successfulStocks) {
                 try {
@@ -192,14 +174,12 @@ public class MLController {
         try {
             System.out.println("Starting model training for user: " + userId);
 
-            // Get available symbols
             Set<String> availableSymbols = stockDataRepository.findDistinctSymbolsByUserId(userId);
             List<String> trainedSymbols = new ArrayList<>();
             List<String> failedSymbols = new ArrayList<>();
 
             for (String symbol : availableSymbols) {
                 try {
-                    // Check if we have enough data
                     LocalDate endDate = LocalDate.now();
                     LocalDate startDate = endDate.minusYears(2);
                     List<StockData> data = stockDataRepository.findByUserIdAndSymbolAndDateBetweenOrderByDateAsc(
@@ -245,7 +225,6 @@ public class MLController {
         try {
             System.out.println("Generating predictions...");
 
-            // Get models
             List<MLModel> models = mlModelRepository.findAll();
             List<String> predictedSymbols = new ArrayList<>();
             List<String> failedSymbols = new ArrayList<>();
@@ -290,23 +269,24 @@ public class MLController {
             System.out.println("=== Starting Full ML Pipeline ===");
             System.out.println("Using sample data: " + useSampleData);
 
-            // Step 1: Data Collection
             System.out.println("\n--- Step 1: Data Collection ---");
             Map<String, Object> dataCollection = startDataCollection(useSampleData).getBody();
 
-            // Step 2: Model Training
             System.out.println("\n--- Step 2: Model Training ---");
-            Thread.sleep(2000); // Brief pause to ensure data is saved
+            Thread.sleep(2000);
             ResponseEntity<Map<String, Object>> trainResponse = trainModels();
             Map<String, Object> modelTraining = trainResponse.getBody();
 
-            // Step 3: Prediction Generation
+            if (modelTraining.get("status") != "success") {
+                response.put("status", "partial");
+                response.put("message", "Data collection succeeded but model training had issues");
+            }
+
             System.out.println("\n--- Step 3: Prediction Generation ---");
-            Thread.sleep(2000); // Brief pause to ensure models are saved
+            Thread.sleep(2000);
             ResponseEntity<Map<String, Object>> predictResponse = generatePredictions();
             Map<String, Object> predictionGeneration = predictResponse.getBody();
 
-            // Compile results
             response.put("status", "success");
             response.put("dataCollection", dataCollection);
             response.put("modelTraining", modelTraining);
