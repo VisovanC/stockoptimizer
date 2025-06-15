@@ -470,7 +470,11 @@
       });
       const predictionGeneration = await predictResponse.json();
 
+      // Update to 100% after predictions are done
       updateProgress(100);
+
+      // Small delay to show 100% before hiding
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       if (predictionGeneration.status === 'success') {
         showResult('fullPipelineResult',

@@ -137,15 +137,17 @@ a:hover {
 }
 
 .btn-success {
-  background-color: var(--primary-blue);
-  border-color: var(--primary-blue);
+  background-color: #28a745;
+  border-color: #28a745;
 }
 
 .btn-success:hover,
 .btn-success:focus,
 .btn-success:active {
-  background-color: #152d49;
-  border-color: #152d49;
+  background-color: #218838;
+  border-color: #1e7e34;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
 }
 
 .btn-outline-primary {

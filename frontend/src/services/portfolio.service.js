@@ -95,20 +95,40 @@ const portfolioService = {
 
           const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
+          if (!jsonData || jsonData.length === 0) {
+            reject(new Error('No data found in Excel file'));
+            return;
+          }
+
           const portfolioData = {
             name: file.name.replace(/\.[^/.]+$/, ''), // Remove file extension
             description: `Imported from ${file.name}`,
-            stocks: jsonData.map(row => ({
-              symbol: (row['Symbol'] || row['Ticker'] || row['Stock'] || '').toUpperCase(),
-              companyName: row['Company Name'] || row['Name'] || '',
-              shares: parseInt(row['Shares'] || row['Quantity'] || 0),
-              entryPrice: parseFloat(row['Entry Price'] || row['Purchase Price'] || row['Cost'] || 0),
-              entryDate: row['Entry Date'] || row['Purchase Date'] || new Date().toISOString()
-            })).filter(stock => stock.symbol && stock.shares > 0)
+            stocks: jsonData.map(row => {
+              // Try different column name variations
+              const symbol = (row['Symbol'] || row['Ticker'] || row['Stock'] || row['SYMBOL'] || row['symbol'] || '').toString().toUpperCase();
+              const companyName = row['Company Name'] || row['Name'] || row['Company'] || row['COMPANY NAME'] || row['name'] || '';
+              const shares = parseInt(row['Shares'] || row['Quantity'] || row['QTY'] || row['shares'] || row['SHARES'] || 0);
+              const entryPrice = parseFloat(row['Entry Price'] || row['Purchase Price'] || row['Price'] || row['Cost'] || row['PRICE'] || row['price'] || 0);
+              const entryDate = row['Entry Date'] || row['Purchase Date'] || row['Date'] || row['DATE'] || new Date().toISOString();
+
+              return {
+                symbol: symbol,
+                companyName: companyName || symbol + ' Corp.',
+                shares: shares,
+                entryPrice: entryPrice,
+                entryDate: entryDate
+              };
+            }).filter(stock => stock.symbol && stock.shares > 0 && stock.entryPrice > 0)
           };
+
+          if (portfolioData.stocks.length === 0) {
+            reject(new Error('No valid stocks found in Excel file. Please check your data format.'));
+            return;
+          }
 
           resolve(portfolioData);
         } catch (error) {
+          console.error('Error parsing Excel:', error);
           reject(new Error('Failed to parse Excel file: ' + error.message));
         }
       };

@@ -105,7 +105,8 @@ public class PortfolioController {
                 stock.setCompanyName(stockRequest.getCompanyName());
                 stock.setShares(stockRequest.getShares());
                 stock.setEntryPrice(stockRequest.getEntryPrice());
-                stock.setEntryDate(LocalDateTime.now());
+                stock.setEntryDate(stockRequest.getEntryDate() != null ?
+                        stockRequest.getEntryDate() : LocalDateTime.now());
                 stocks.add(stock);
             }
         }

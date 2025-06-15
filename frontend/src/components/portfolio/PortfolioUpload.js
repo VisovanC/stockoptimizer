@@ -15,16 +15,34 @@ const PortfolioUpload = () => {
 
     const onDrop = useCallback(async (acceptedFiles) => {
         const file = acceptedFiles[0];
-        if (!file) return;
+        if (!file) {
+            setError('No file selected');
+            return;
+        }
 
         try {
             setError('');
+            setUploadedData(null);
+
+            console.log('Processing file:', file.name);
+
             const data = await portfolioService.parseExcelFile(file);
+
+            console.log('Parsed data:', data);
+
             setUploadedData(data);
             setPortfolioName(data.name);
             setPortfolioDescription(data.description);
+
+            if (data.stocks.length === 0) {
+                setError('No valid stocks found in the Excel file');
+            } else {
+                toast.success(`Successfully parsed ${data.stocks.length} stocks from Excel`);
+            }
         } catch (err) {
-            setError(err.message);
+            console.error('Error parsing file:', err);
+            setError(err.message || 'Failed to parse Excel file');
+            setUploadedData(null);
         }
     }, []);
 
@@ -38,26 +56,54 @@ const PortfolioUpload = () => {
     });
 
     const handleSubmit = async () => {
-        if (!uploadedData) return;
+        if (!uploadedData) {
+            setError('No data to upload');
+            return;
+        }
 
         if (!portfolioName.trim()) {
             setError('Please enter a portfolio name');
             return;
         }
 
+        if (uploadedData.stocks.length === 0) {
+            setError('No valid stocks to upload');
+            return;
+        }
+
         setLoading(true);
+        setError('');
+
         try {
             const portfolioData = {
-                ...uploadedData,
-                name: portfolioName,
-                description: portfolioDescription || uploadedData.description
+                name: portfolioName.trim(),
+                description: portfolioDescription || uploadedData.description,
+                stocks: uploadedData.stocks.map(stock => ({
+                    symbol: stock.symbol.toUpperCase(),
+                    companyName: stock.companyName || stock.symbol + ' Corp.',
+                    shares: parseInt(stock.shares) || 0,
+                    entryPrice: parseFloat(stock.entryPrice) || 0
+                })).filter(stock =>
+                    stock.symbol &&
+                    stock.shares > 0 &&
+                    stock.entryPrice > 0
+                )
             };
+
+            if (portfolioData.stocks.length === 0) {
+                setError('No valid stocks after validation. Please check your data.');
+                setLoading(false);
+                return;
+            }
+
+            console.log('Submitting portfolio:', portfolioData);
 
             await portfolioService.createPortfolio(portfolioData);
             toast.success('Portfolio created successfully!');
             navigate('/portfolios');
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to create portfolio');
+            console.error('Error creating portfolio:', err);
+            setError(err.response?.data?.message || err.message || 'Failed to create portfolio');
         } finally {
             setLoading(false);
         }
@@ -99,27 +145,6 @@ const PortfolioUpload = () => {
         });
     };
 
-    const downloadTemplate = () => {
-        const templateData = [
-            ['Symbol', 'Company Name', 'Shares', 'Entry Price', 'Entry Date'],
-            ['AAPL', 'Apple Inc.', '100', '150.00', '2024-01-15'],
-            ['MSFT', 'Microsoft Corporation', '50', '300.00', '2024-02-01'],
-            ['GOOGL', 'Alphabet Inc.', '20', '2500.00', '2024-03-01']
-        ];
-
-        // Create CSV content
-        const csvContent = templateData.map(row => row.join(',')).join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', 'portfolio_template.csv');
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
     const calculateTotalValue = () => {
         if (!uploadedData || !uploadedData.stocks) return 0;
         return uploadedData.stocks.reduce((total, stock) =>
@@ -130,24 +155,6 @@ const PortfolioUpload = () => {
     return (
         <Container className="py-4">
             <h2 className="mb-4">Upload Portfolio from Excel</h2>
-
-            <Row className="mb-4">
-                <Col>
-                    <Card>
-                        <Card.Body>
-                            <div className="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h5>Need a template?</h5>
-                                    <p className="mb-0">Download our Excel template to see the required format</p>
-                                </div>
-                                <Button variant="outline-primary" onClick={downloadTemplate}>
-                                    Download Template
-                                </Button>
-                            </div>
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row>
 
             <Card className="mb-4">
                 <Card.Body>

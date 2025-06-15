@@ -137,16 +137,17 @@ a:hover {
 }
 
 .btn-success {
-  background-color: #1E3E62 !important;
-  border-color: #1E3E62 !important;
+  background-color: #28a745 !important;
+  border-color: #28a745 !important;
 }
 
 .btn-success:hover,
 .btn-success:focus,
 .btn-success:active {
-  background-color: #152d49 !important;
-  border-color: #152d49 !important;
+  background-color: #218838 !important;
+  border-color: #1e7e34 !important;
   transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3) !important;
 }
 
 .btn-warning {
