@@ -304,7 +304,7 @@ public class AIPortfolioUpgraderService {
                         .findBySymbolOrderByPredictionDateDesc(symbol);
 
                 StockPrediction prediction;
-                if (!predictions.isEmpty() && predictions.get(0).getUserId().equals(userId)) {
+                if (!predictions.isEmpty() && userId.equals(predictions.get(0).getUserId())) {
                     prediction = predictions.get(0);
                 } else {
                     List<StockPrediction> generatedPredictions = neuralNetworkService.predictFuturePrices(symbol, userId);
